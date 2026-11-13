@@ -21,6 +21,7 @@ Python runs where the work needs it: parsing and evaluation. Parsing a large rep
     ▼
 [ apps/gateway · Worker ]
   ├── Static assets from apps/web
+  ├── RateLimiter Durable Object  hourly counts for each IP address
   ├── POST /v1/indexes           Turnstile, rate limit, GitHub check
   ├── GET  /v1/indexes/:id        status
   ├── POST /v1/indexes/:id/questions   retrieve, rerank, stream answer
@@ -68,12 +69,20 @@ Hono. One controller for each route group.
 
 **Index request.**
 
-1. Verify the Turnstile token. Apply the rate limit binding for the IP address.
+1. Verify the Turnstile token. Apply the hourly index limit for the IP address.
 2. Parse the link. Call `GET /repos/{owner}/{repo}` on the GitHub API with the server token.
 3. Reject a private repository, a missing repository, and a repository over the size limit.
-4. Read the head commit of the default branch.
+   - The `size` field of the response is in kilobytes.
+4. Read the head commit sha with `GET /repos/{owner}/{repo}/branches/{default_branch}`. The repository response holds the branch name only.
 5. When `indexes` has a row for that repository and commit, return it.
-6. Otherwise insert the row as `queued`, and create an `IndexRepository` instance with the id `<repositoryId>-<sha>`. A duplicate id fails on create. Treat that error as done.
+6. Call `GET /repos/{owner}/{repo}/git/trees/{sha}?recursive=1`. Count the `blob` entries. Reject the repository when the count passes the file limit.
+   - The count includes files that the indexer skips. So the check is stricter than the limit on indexed files.
+   - GitHub sets `truncated` when a tree has more than 100,000 entries. Treat a truncated tree as over the limit.
+7. Otherwise insert the row as `queued`, and create an `IndexRepository` instance with the id `<repositoryId>-<sha>`. A duplicate id fails on create. Treat that error as done.
+
+**Rate limits.** The `RateLimiter` Durable Object holds the hourly counts. One object serves one IP address. It counts index requests and questions in fixed one-hour windows.
+
+- The Workers rate limit binding does not fit. Its period is 10 or 60 seconds, and each Cloudflare location keeps its own count.
 
 **Question.** Refer to section 4, Scenario B.
 
@@ -87,7 +96,9 @@ Hono. One controller for each route group.
 4. Set the status to `embedding`.
 5. For each batch key, run one step:
    - Read the JSONL batch from R2.
-   - Insert the chunks into D1 in one batch statement.
+   - Insert the chunks into D1 with one `db.batch()` call that holds one `INSERT` for each chunk.
+     - D1 allows 100 bound parameters and 100 KB in each statement. So one multi-row `INSERT` cannot hold 500 chunks.
+     - The 30-second query limit applies to the whole batch.
    - Embed the chunk text with the embedding model.
    - Upsert the vectors into the namespace of the index.
 6. Set the status to `ready`, with the file count and the chunk count.
@@ -127,7 +138,7 @@ Python 3.12, managed with uv. The image holds FastAPI, `tree-sitter`, `tree-sitt
 - Each chunk holds:
   - `path`, `language`, `symbol`, `kind`, `startLine`, and `endLine`
   - `content`: the source lines
-  - `header`: the path and the enclosing symbol. The embedding input is the header plus the content.
+  - `header`: the path and the enclosing symbol. The embedding input is `title: <header> | text: <content>`.
   - `identifiers`: each identifier in the chunk, plus its parts. `getUserById` gives `get user by id`.
 
 ### Tier 5: Data stores
@@ -135,6 +146,7 @@ Python 3.12, managed with uv. The image holds FastAPI, `tree-sitter`, `tree-sitt
 **D1** holds the rows. Drizzle defines the schema in `packages/db`. The SQL lives in `infra/migrations`.
 
 - `repositories` — id, owner, name, default branch, created time
+  - The id is the numeric GitHub repository id. The index id and the vector id hold it, and Vectorize limits both to 64 bytes. A UUID makes the vector id 78 bytes or more.
 - `indexes` — id, repository id, commit sha, status, stage, error, file count, chunk count, embedding model id, created time, ready time, last question time
 - `chunks` — id, index id, path, language, symbol, kind, start line, end line, content, identifiers
 - `chunks_fts` — an FTS5 table over `chunks`. Phase 3.
@@ -160,9 +172,16 @@ D1 stops at 10 GB for one database. The 30-day cleanup keeps the chunk text unde
 
 AI Gateway fronts each model call. It records the model id, the tokens, and the latency for the `questions` row. Each model id is a Worker var.
 
-- **Embeddings.** Phase 1 starts with a Workers AI embedding model that covers code, such as `embeddinggemma-2`. Phase 3 compares it with `voyage-code-3` and `text-embedding-3-small` through AI Gateway. Each candidate fits the Vectorize limit of 1536 dimensions.
+- **Embeddings.** Phase 1 starts with the Workers AI model `@cf/google/embeddinggemma-2`. It covers code, gives 768 dimensions, and has an 8,192-token context window.
+  - The model expects task prefixes. A question becomes `task: search result | query: <question>`. A chunk uses the `title` and `text` form in the chunk rules.
+  - The model page states no batch size limit for each call. Measure it on staging before you fix the embed step at 500 chunks.
+  - Phase 3 compares it with `voyage-code-3` and `text-embedding-3-small` through AI Gateway. Each candidate fits the Vectorize limit of 1536 dimensions.
 - **Reranker.** Phase 3 starts with Workers AI `bge-reranker-base`. The ablation compares it with Cohere Rerank through AI Gateway.
-- **Answer model.** One chat model with streaming. Temperature 0.
+- **Answer model.** OpenRouter model `anthropic/claude-haiku-5.5`, through the AI Gateway OpenRouter route. Stream the tokens. Temperature 0. The Worker var is `ANSWER_MODEL_ID`.
+  - Set `reasoning.effort` to `none`. Thinking is on by default. Thinking tokens delay the first answer token and add to the output bill.
+  - OpenRouter lists this model at $0.10 per million input tokens and $0.50 per million output tokens, as of November 2026.
+  - Prefer the Anthropic route. Its p50 latency is 0.88 seconds. The Bedrock route is 2.44 seconds, and that route can miss the 3-second first-token target.
+  - `openai/gpt-6-luna` has the same list price. Its standard routes are slower, at about 2.6 to 3.2 seconds. `google/gemini-3.7-flash` scores higher and costs $0.75 and $3.75 per million tokens. Swap `ANSWER_MODEL_ID` only after an eval.
 
 ### Tier 7: Evals (`apps/evals`)
 
@@ -190,7 +209,7 @@ Python 3.12, managed with uv. CI runs it against the staging gateway.
 
 ### Scenario B: The user asks a question
 
-1. The gateway applies the rate limit and loads the index. It rejects an index that is not `ready`.
+1. The gateway applies the hourly question limit and loads the index. It rejects an index that is not `ready`.
 2. Phase 1: embed the question, then query Vectorize with `topK` 8 in the namespace of the index.
 3. Phase 3: run the hybrid path instead.
    1. Embed the question. Query Vectorize with `topK` 50 and the scope filters.
@@ -254,9 +273,9 @@ The trace calls no model, so it costs no tokens.
 - **Repository text is data.** The prompt marks each chunk as data. The answer contract tells the model to ignore an instruction inside a chunk. A golden case tests it.
 - **No code runs.** The indexer parses files. It does not run a build, a script, or a package install.
 - **Tarball safety.** The extract step rejects a path that leaves the target folder, and a symbolic link.
-- **Abuse.** Turnstile and the rate limit binding guard the gateway. The size limits guard the container.
+- **Abuse.** Turnstile and the `RateLimiter` Durable Object guard the gateway. The size limits guard the container.
 - **Index scope.** The index id comes from the route. Each Vectorize query sets the namespace. Each FTS5 query starts with the index id.
-- **Secrets.** `GITHUB_TOKEN`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `TURNSTILE_SECRET`, and the model keys are Worker secrets. The pipeline passes the R2 keys and the GitHub token to the container as environment variables.
+- **Secrets.** `GITHUB_TOKEN`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `TURNSTILE_SECRET`, and `OPENROUTER_API_KEY` are Worker secrets. The pipeline passes the R2 keys and the GitHub token to the container as environment variables. The container does not receive the OpenRouter key.
 
 ---
 
@@ -270,7 +289,7 @@ One environment: staging. Each resource name is `repotron-staging-<role>`, such 
   2. Apply the D1 migrations.
   3. Deploy the gateway and the pipeline. The pipeline deploy builds the indexer image, so the runner needs Docker.
   4. Phase 2: run `apps/evals` against staging. Fail on a regression.
-- One-time setup: the Cloudflare API token, the Vectorize index with its metadata indexes, the R2 API keys, the Turnstile site, and the GitHub token.
+- One-time setup: the Cloudflare API token, the Vectorize index with its metadata indexes, the R2 API keys, the Turnstile site, the GitHub token, and the OpenRouter token.
 
 ### Why these Cloudflare products
 
@@ -281,8 +300,8 @@ One environment: staging. Each resource name is `repotron-staging-<role>`, such 
 - **Vectorize** holds the vectors, with one namespace for each index.
 - **R2** carries the chunk batches from the container to the Workflow.
 - **Workers AI** runs the embeddings and the reranker on Cloudflare.
-- **AI Gateway** records the model id, the tokens, and the latency of each call.
-- **Turnstile** and the **rate limit binding** limit the cost of each anonymous user.
+- **AI Gateway** routes the answer call to OpenRouter. It records the model id, the tokens, and the latency of each call.
+- **Turnstile** and a **Durable Object** counter limit the cost of each anonymous user.
 
 ---
 
@@ -313,4 +332,6 @@ repotron/
     └── migrations/              # D1 SQL
 ```
 
-`packages/domain` holds `MAX_CHUNK_TOKENS`, `RRF_K` (60), `RETRIEVAL_TOP_K` (50), `CONTEXT_CHUNKS` (8), `CONFIDENCE_HIGH` (0.7), `CONFIDENCE_MEDIUM` (0.3), and `START_HERE_MAX_PATHS` (500). The Python indexer reads the chunk shape from a JSON Schema that `packages/domain` exports, so both languages use one contract.
+`packages/domain` holds `MAX_CHUNK_TOKENS`, `RRF_K` (60), `RETRIEVAL_TOP_K` (50), `CONTEXT_CHUNKS` (8), `CONFIDENCE_HIGH` (0.7), `CONFIDENCE_MEDIUM` (0.3), and `START_HERE_MAX_PATHS` (500). `MAX_CHUNK_TOKENS` has no value yet. The value must keep the header and the content under the 8,192-token window of the embedding model. `tiktoken` counts tokens differently from the Gemma tokenizer, so leave a margin.
+
+The Python indexer reads the chunk shape from a JSON Schema that `packages/domain` exports, so both languages use one contract.

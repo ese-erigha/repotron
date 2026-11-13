@@ -102,7 +102,8 @@ The product goal is a correct answer with a citation that the user can check. Th
   - Done when the link is `https://github.com/<owner>/<repo>/blob/<sha>/<path>#L<start>-L<end>`.
 - **US-3.4:** As a user, I want a plain "not found" answer when the code does not hold the answer, so that I do not trust an invented answer.
 - **US-3.5:** As a user, I want text inside the repository treated as data, so that a comment in the code cannot change the answer rules.
-  - Done when a golden case with an injected instruction in a code comment keeps the answer format.
+  - Phase 1: done when a gateway test with an injected instruction in a chunk keeps the answer format.
+  - Phase 2: done when a golden case with an injected instruction in a code comment keeps the answer format.
 - **US-3.6:** As a user, I want a link to an answer, so that I can send it to a teammate.
   - Done when `/a/:id` shows the question, the answer, and the citations with their code.
   - Done when the page still works after the cleanup cron deletes the index.
@@ -112,13 +113,14 @@ The product goal is a correct answer with a citation that the user can check. Th
   - Done when each item in the answer cites a file.
 - **US-3.8:** As a user, I want an "Explain this feature" button, so that I get a structured explanation of one feature.
   - Done when the user types the feature name, and the answer has four sections: what it does, the flow, the key files, and the edge cases.
+- **US-3.9:** As the maintainer, I want each question to store the model ids, the token counts, and the latency of each stage, so that cost and delay have a source.
+  - Done when each `questions` row holds these values from AI Gateway.
 
 ### Epic 4: Guard the quality bar (Phase 2)
 
 - **US-4.1:** As the maintainer, I want a versioned golden set of questions with ground-truth line ranges, so that a change has a fixed test.
 - **US-4.2:** As the maintainer, I want each pull request to report the metrics of section 6, so that a regression is visible before merge.
 - **US-4.3:** As the maintainer, I want the check to fail when a score drops more than 2 percentage points below the baseline, so that a weaker change does not merge.
-- **US-4.4:** As the maintainer, I want each question to store the model ids, the token counts, and the latency of each stage, so that cost and delay have a source.
 
 ### Epic 5: Hybrid retrieval (Phase 3)
 
@@ -149,6 +151,8 @@ The model receives the question and the numbered chunks. Each chunk starts with 
 ```text
 [3] src/auth/session.py:41-88 (class SessionStore)
 ```
+
+The answer model is OpenRouter `anthropic/claude-haiku-5.5`. [architecture.md](architecture.md) holds the route, the price, and the reasoning setting.
 
 The system prompt states four rules:
 
@@ -191,15 +195,17 @@ The check compares the quality scores with the baseline file. It prints latency 
 
 These are targets. Measure them on staging.
 
-- **Retrieval time.** p95 under 800 ms, from the question to the reranked chunk list.
+- **Retrieval time.** p95 under 800 ms, from the question to the final chunk list.
+  - Phase 1 measures to the dense list. Phase 3 measures to the reranked list.
 - **First token.** p95 under 3 seconds.
 - **Index time.** A repository with 1,000 source files is ready within 5 minutes.
 - **Abuse.** Turnstile guards each index request. The starting rate limits for each IP address are:
   - 5 index requests each hour
   - 30 questions each hour
+  - A Durable Object counts these limits. The Workers rate limit binding allows only a 10-second or a 60-second period.
 - **Isolation.** A query reads one index only. The index id comes from the route, not from the question text.
 - **Retention.** A cron deletes an index that nobody queried for 30 days.
-- **Secrets.** The GitHub token, the R2 keys, and the model keys are Worker secrets. Logs omit them.
+- **Secrets.** The GitHub token, the R2 keys, and the OpenRouter token are Worker secrets. Logs omit them.
 
 ---
 
@@ -209,10 +215,12 @@ These are targets. Measure them on staging.
 
 - [ ] Add the pnpm workspace, the uv workspace, and the shared packages.
 - [ ] Add the D1 schema and the first migration.
+- [ ] Add the `RateLimiter` Durable Object for the hourly limits.
 - [ ] Validate the link, read the repository from the GitHub API, and check the limits.
 - [ ] Build the Python indexer image: fetch the tarball, parse with Tree-sitter, and write chunk batches to R2.
 - [ ] Run the `IndexRepository` Workflow: fetch, parse, store, embed, and mark ready.
-- [ ] Add dense retrieval and the streamed answer with citations.
+- [ ] Add dense retrieval and the streamed answer from `anthropic/claude-haiku-5.5` on OpenRouter, with citations.
+- [ ] Send each model call through AI Gateway. Store the model ids, the tokens, and the latency in the `questions` row.
 - [ ] Add the home, status, and ask screens.
 - [ ] Add the two preset buttons.
 - [ ] Add the Share button and the answer page.
