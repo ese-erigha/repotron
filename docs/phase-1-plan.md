@@ -978,8 +978,8 @@ detect-changes → test → migrate (when SQL changed)
 - **test.** Install pnpm, Node 22, and uv with `astral-sh/setup-uv`. Run `pnpm install --frozen-lockfile`, then `pnpm turbo run lint typecheck test build`. Turbo runs the Python scripts through `apps/indexer/package.json`.
 - **migrate.** Look up `repotron-staging-db` by name. When it is missing, fail with "Create D1 repotron-staging-db with cf, as in docs/phase-1-plan.md, section 7." Apply with `cf d1 migrations apply` from `apps/gateway`.
 - **ensure-resources.** Run `scripts/ensure-resources-staging.sh`. It creates each missing CI resource: the R2 bucket, the Vectorize index and its 3 metadata indexes, and the AI Gateway. Stage 4 of section 7 gives the commands. A second run creates nothing.
-- **deploy-pipeline.** Runs `pnpm exec cf deploy --message "<sha>"` in `apps/pipeline`. The runner has Docker, and `cf` builds the indexer image.
-- **deploy-gateway.** Runs after deploy-pipeline succeeds or is skipped. The Workflow binding needs the pipeline Worker.
+- **deploy-pipeline.** Run `pnpm build`, then `pnpm exec cf deploy --message "<sha>"` in `apps/pipeline`. The shared packages export `dist`, and a fresh runner has no `dist` until that build. The runner has Docker, and `cf` builds the indexer image.
+- **deploy-gateway.** Run `pnpm build`, then deploy. It runs after deploy-pipeline succeeds or is skipped. The Workflow binding needs the pipeline Worker.
 - **deploy-web.** Runs after test. It has no binding, so it does not wait for another deploy. `cf deploy` in `apps/web` builds the client and uploads the assets.
 - **summary.** Prints each result, as in Mailer.
 

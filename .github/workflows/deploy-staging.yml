@@ -176,6 +176,7 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm build
       - name: Deploy pipeline to Cloudflare Workers
         working-directory: apps/pipeline
         env:
@@ -201,6 +202,7 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm build
       - name: Deploy gateway to Cloudflare Workers
         working-directory: apps/gateway
         env:
