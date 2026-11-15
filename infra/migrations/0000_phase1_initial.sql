@@ -1,3 +1,4 @@
+-- Trigger a staging deploy.
 CREATE TABLE github_repositories (
   id TEXT PRIMARY KEY NOT NULL,
   owner TEXT NOT NULL,

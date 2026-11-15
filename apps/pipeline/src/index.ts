@@ -1,3 +1,4 @@
+// Trigger a staging deploy.
 import { deleteStaleIndexes } from './delete-stale-indexes/delete-stale-indexes.ts'
 import { pipelineContext, pipelineStorage } from './context.ts'
 import { Indexer } from './indexer-container/indexer-container.ts'

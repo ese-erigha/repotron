@@ -1,5 +1,6 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "globalPassThroughEnv": ["UV_CACHE_DIR"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
