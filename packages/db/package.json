@@ -1,0 +1,31 @@
+{
+  "name": "db",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "lint": "oxlint",
+    "typecheck": "tsc -p tsconfig.json --noEmit --pretty false",
+    "test": "node --test $(find src -name '*.test.ts')"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.45.4",
+    "repotron-domain": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^24.19.2",
+    "better-sqlite3": "^12.4.1",
+    "oxlint": "^1.88.0",
+    "typescript": "~6.0.3"
+  }
+}

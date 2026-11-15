@@ -106,7 +106,7 @@ export async function requestIndex(body: RequestIndexBody): Promise<IndexView> {
                  │  link box · Turnstile        │
                  │  recent indexes              │
                  └──────┬────────────────┬──────┘
-   POST /v1/indexes     │                │  select a recent index
+   POST /api/v1/indexes     │                │  select a recent index
    201 or 200           ▼                ▼
       ┌──────────────────────────────────────────────────┐
       │  /r/:owner/:repo?index=<indexId>   Repository     │
@@ -200,10 +200,10 @@ The screen picks one view from the URL and the index status:
 read ?index from the URL
   │
   ├─ missing ──────────────────────► StartIndexCard
-  │                                    Turnstile → POST /v1/indexes
+  │                                    Turnstile → POST /api/v1/indexes
   │                                    → replace the URL with ?index=<id>
   ▼
-useIndexStatus(indexId)   (reads GET /v1/indexes/:id every STATUS_POLL_MS until ready or failed)
+useIndexStatus(indexId)   (reads GET /api/v1/indexes/:id every STATUS_POLL_MS until ready or failed)
   │
   ├─ 404 ──────────────────────────► EmptyState "This index does not exist." · link to Home
   ├─ ready ────────────────────────► AskPanel(indexId)
@@ -368,8 +368,8 @@ RepositoryScreen               useIndexStatus(indexId) · useRequestIndex()
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-- The screen reads `GET /v1/questions/:id` only. It works after the cleanup deletes the index.
-- The sources are the cited chunks that the `questions` row stores. Each keeps its original number.
+- The screen reads `GET /api/v1/questions/:id` only. It works after the cleanup deletes the index.
+- The sources are the cited chunks that the `answered_questions` row stores. Each keeps its original number.
 - "Ask your own question" goes to `/r/:owner/:repo`, which shows the start card.
 - A `404` shows "This answer does not exist."
 
@@ -488,7 +488,7 @@ Screen ──► use-*.ts hook ──► *.service.ts ──► getHttpClient() 
                                                                                   │ API_ORIGIN + path
                                                                                   │ HTTPS, CORS
                                                                                   ▼
-                                                                           gateway /v1/*
+                                                                           gateway /api/v1/*
 Screen ◄── data, isLoading, error ◄── response.json() or response.body ◄── 2xx ──┤
                                       ApiError ◄── toApiError ◄── 4xx, 5xx, or no response
 ```
@@ -504,13 +504,13 @@ Each hook keeps its state with `useState` or `useReducer`. A request id in a ref
 
 ```
 Browser                              Gateway                     Pipeline
-  GET /v1/indexes/:id ─────────────► queued
+  GET /api/v1/indexes/:id ─────────────► queued
      … 2 s
-  GET /v1/indexes/:id ─────────────► parsing                ◄── Workflow marks parsing
+  GET /api/v1/indexes/:id ─────────────► parsing                ◄── Workflow marks parsing
      … 2 s
-  GET /v1/indexes/:id ─────────────► embedding              ◄── Workflow marks embedding
+  GET /api/v1/indexes/:id ─────────────► embedding              ◄── Workflow marks embedding
      … 2 s
-  GET /v1/indexes/:id ─────────────► ready                  ◄── Workflow marks ready
+  GET /api/v1/indexes/:id ─────────────► ready                  ◄── Workflow marks ready
   polling stops · the ask panel shows
 ```
 
@@ -527,7 +527,7 @@ RepositoryScreen      use-answer-stream          answer-stream.service.ts       
   ask(body) ────────► abort the earlier stream
                       dispatch started
                       for await (event) ◄─────── openAnswerStream
-                                                   postStream ─────────────── POST /v1/indexes/:id/questions
+                                                   postStream ─────────────── POST /api/v1/indexes/:id/questions
                                                    not 2xx → request throws ApiError (JSON envelope)
                                                    201 → body → TextDecoderStream
                                                    split at each blank line
@@ -594,7 +594,7 @@ TurnstileWidget unmounts → turnstile.remove(widgetId)
   - `INDEX_QUERY` (`index`)
   - `repositoryPath(owner, repo, indexId?)` and `answerPath(questionId)`
 - `services/api/endpoints.ts`
-  - `INDEX_PATH`: `LIST` (`/v1/indexes`), `byId(id)`, and `questions(indexId)`
+  - `INDEX_PATH`: `LIST` (`/api/v1/indexes`), `byId(id)`, and `questions(indexId)`
   - `QUESTION_PATH`: `byId(id)`
 - `<feature>.constants.ts` — the labels and the messages of that feature, such as `ASK.PLACEHOLDER` and `INDEX_STATUS_TEXT.FAILED_TITLE`
 - `config/public-config.ts` — `API_ORIGIN` and `TURNSTILE_SITE_KEY`. Both values are public.

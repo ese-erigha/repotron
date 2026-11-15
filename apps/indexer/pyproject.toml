@@ -1,0 +1,39 @@
+[project]
+name = "indexer"
+version = "0.0.0"
+requires-python = ">=3.12"
+dependencies = [
+  "boto3",
+  "fastapi",
+  "httpx",
+  "tiktoken",
+  "tree-sitter",
+  "tree-sitter-language-pack",
+  "uvicorn",
+]
+
+[dependency-groups]
+dev = [
+  "jsonschema",
+  "mypy",
+  "pytest",
+  "ruff",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.mypy]
+strict = true
+mypy_path = "src"
+packages = ["indexer"]
+
+[[tool.mypy.overrides]]
+module = ["tree_sitter_language_pack", "boto3", "botocore", "botocore.*", "tiktoken"]
+ignore_missing_imports = true

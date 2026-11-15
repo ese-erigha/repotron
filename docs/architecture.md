@@ -27,13 +27,13 @@ Python runs where the work needs it: parsing and evaluation. Parsing a large rep
     ▼
 [ apps/gateway · Worker ]
   ├── RateLimiter Durable Object        hourly counts for each IP address
-  ├── POST /v1/indexes                  Turnstile, rate limit, GitHub check
-  ├── GET  /v1/indexes                  recent ready indexes
-  ├── GET  /v1/indexes/:id              status
-  ├── POST /v1/indexes/:id/questions    retrieve, stream answer
-  ├── GET  /v1/questions/:id            shared answer
-  ├── GET  /v1/indexes/:id/symbols/:name   symbol trace · Phase 3
-  └── GET  /v1/evals                    dashboard data · Phase 4
+  ├── POST /api/v1/indexes                  Turnstile, rate limit, GitHub check
+  ├── GET  /api/v1/indexes                  recent ready indexes
+  ├── GET  /api/v1/indexes/:id              status
+  ├── POST /api/v1/indexes/:id/questions    retrieve, stream answer
+  ├── GET  /api/v1/questions/:id            shared answer
+  ├── GET  /api/v1/indexes/:id/symbols/:name   symbol trace · Phase 3
+  └── GET  /api/v1/evals                    dashboard data · Phase 4
     │
     │  Workflow binding
     ▼
@@ -48,7 +48,7 @@ Python runs where the work needs it: parsing and evaluation. Parsing a large rep
   fetch tarball → walk files → Tree-sitter → chunks → R2
 
 Shared stores
-  ├── [ D1 ]          github_repositories, indexes, chunks, questions, chunks_fts (Phase 3)
+  ├── [ D1 ]          github_repositories, repository_indexes, source_chunks, answered_questions, source_chunks_fts (Phase 3)
   ├── [ Vectorize ]   one namespace per index
   ├── [ R2 ]          chunk batches, eval reports
   ├── [ Workers AI ]  embeddings, reranker
@@ -85,7 +85,7 @@ Hono. One controller for each route group. One use case for each action.
 3. Reject a missing repository and a private repository with one error. GitHub returns `404` for both. Reject a repository over the size limit.
    - The `size` field of the response is in kilobytes.
 4. Read the head commit sha with `GET /repos/{owner}/{repo}/branches/{default_branch}`. The repository response holds the branch name only.
-5. When `indexes` has a row for that repository and commit, return it.
+5. When `repository_indexes` has a row for that repository and commit, return it.
    - When that row is `failed`, reset it to `queued` and call `restart()` on its Workflow instance. That is the retry.
 6. Call `GET /repos/{owner}/{repo}/git/trees/{sha}?recursive=1`. Count the `blob` entries. Reject the repository when the count passes the file limit.
    - The count includes files that the indexer skips. So the check is stricter than the limit on indexed files.
@@ -96,7 +96,7 @@ Hono. One controller for each route group. One use case for each action.
 
 - The Workers rate limit binding does not fit. Its period is 10 or 60 seconds, and each Cloudflare location keeps its own count.
 
-**Status.** `GET /v1/indexes/:id` also returns `fallbackIndexId`: the newest `ready` index of the same repository, while this index is not `ready`. The ask screen uses it during a re-index.
+**Status.** `GET /api/v1/indexes/:id` also returns `fallbackIndexId`: the newest `ready` index of the same repository, while this index is not `ready`. The ask screen uses it during a re-index.
 
 **Question.** Refer to section 4, Scenario B.
 
@@ -125,8 +125,8 @@ A failed step after its retries sets the status to `failed`, with the stage and 
 **`IndexDeletion` Workflow.** One instance deletes one index.
 
 1. Set the status to `deleting`. A question now gets `409`.
-2. Delete one page of 500 chunks for each step: the vectors by id, then the `chunks` rows. Repeat until no chunk is left.
-3. Delete the `indexes` row. The `questions` rows stay, so each share link still works.
+2. Delete one page of 500 chunks for each step: the vectors by id, then the `source_chunks` rows. Repeat until no chunk is left.
+3. Delete the `repository_indexes` row. The `answered_questions` rows stay, so each share link still works.
 
 **Indexer Container class.** It extends `Container` from `@cloudflare/containers`. The Durable Object name is the index id, so one job owns one container. The starting instance type is `standard-2`: 1 vCPU, 6 GiB memory, and 12 GB disk. `maxInstances` is 5.
 
@@ -169,11 +169,11 @@ Python 3.12. One uv project with its own `uv.lock`, because the Docker build con
 
 - `github_repositories` — id, owner, name, default branch, created time, updated time
   - The id is the numeric GitHub repository id. The index id and the vector id hold it, and Vectorize limits both to 64 bytes. A UUID makes the vector id 78 bytes or more.
-- `indexes` — id, repository id, commit sha, status, failed stage, failure reason, file count, chunk count, embedding model id, created time, updated time, ready time, last question time
+- `repository_indexes` — id, repository id, commit sha, status, failed stage, failure reason, file count, chunk count, embedding model id, created time, updated time, ready time, last question time
   - The status is one of `queued`, `parsing`, `embedding`, `ready`, `failed`, and `deleting`.
-- `chunks` — id, index id, sequence number, path, language, symbol, kind, start line, end line, content, identifiers
-- `chunks_fts` — an FTS5 table over `chunks`. Phase 3.
-- `questions` — id, index id, repository full name, commit sha, preset, question, answer, citations, embedding model id, answer model id, input tokens, output tokens, retrieval time, first token time, answer time, created time
+- `source_chunks` — id, index id, sequence number, path, language, symbol, kind, start line, end line, content, identifiers
+- `source_chunks_fts` — an FTS5 table over `source_chunks`. Phase 3.
+- `answered_questions` — id, index id, repository full name, commit sha, preset, question, answer, citations, embedding model id, answer model id, input tokens, output tokens, retrieval time, first token time, answer time, created time
   - The id is a random 128-bit value, so nobody can guess a share link.
   - `index_id` has no foreign key, so the row outlives its index.
   - `citations` is JSON. It copies each cited chunk: the path, the line range, the symbol, the code, and the GitHub link. Phase 3 adds the confidence label. The share page reads only this row, so it works after the cleanup deletes the index.
@@ -195,7 +195,7 @@ D1 stops at 10 GB for one database. The 30-day cleanup keeps the chunk text unde
 
 ### Tier 6: Models
 
-AI Gateway fronts each model call. It records the model id, the tokens, and the latency for the `questions` row.
+AI Gateway fronts each model call. It records the model id, the tokens, and the latency for the `answered_questions` row.
 
 - **Embeddings.** Phase 1 starts with the Workers AI model `@cf/google/embeddinggemma-2`. It covers code, gives 768 dimensions, and has an 8,192-token context window.
   - The model id is the constant `EMBEDDING_MODEL_ID` in `packages/domain`, not a Worker var. The gateway and the pipeline must use the same model, and the Vectorize dimension depends on it.
@@ -226,10 +226,10 @@ Python 3.12, managed with uv. CI runs it against the staging gateway. Phase 2 de
 
 ### Scenario A: The user indexes a repository
 
-1. The browser posts the link and the Turnstile token to `POST /v1/indexes` on the gateway origin.
-2. The gateway checks the limits, reads the head commit, and inserts the `indexes` row.
+1. The browser posts the link and the Turnstile token to `POST /api/v1/indexes` on the gateway origin.
+2. The gateway checks the limits, reads the head commit, and inserts the `repository_indexes` row.
 3. The gateway creates the Workflow instance and returns `201` with the index view.
-4. The browser moves to `/r/:owner/:repo?index=<indexId>` and polls `GET /v1/indexes/:id` every 2 seconds.
+4. The browser moves to `/r/:owner/:repo?index=<indexId>` and polls `GET /api/v1/indexes/:id` every 2 seconds.
 5. The Workflow runs the container, stores the chunks, embeds them, waits for Vectorize, and sets `ready`.
 6. The browser opens the ask screen.
 
@@ -245,9 +245,9 @@ Python 3.12, managed with uv. CI runs it against the staging gateway. Phase 2 de
    5. Give each kept chunk a confidence label from its reranker score. Refer to the confidence rules below.
 4. Load the chunk rows from D1 and send the `retrieval` event.
 5. Build the prompt from the answer contract in the PRD.
-   - For "Where do I start?", also load the distinct paths of the index from `chunks`, up to `START_HERE_MAX_PATHS`.
+   - For "Where do I start?", also load the distinct paths of the index from `source_chunks`, up to `START_HERE_MAX_PATHS`.
 6. Stream the model tokens as `token` events. A model failure sends one `error` event and ends the stream.
-7. Send `done` with the question id. Write the `questions` row with `ctx.waitUntil`.
+7. Send `done` with the question id. Write the `answered_questions` row with `ctx.waitUntil`.
 
 Vectorize returns 50 results at most when a query asks for metadata. That limit sets the top 50 of the hybrid path.
 
@@ -271,8 +271,8 @@ Vectorize returns 50 results at most when a query asks for metadata. That limit 
 1. A new request finds a new head commit. Scenario A runs for that commit.
 2. Questions use the old index until the new index is `ready`. The status response names the old index in `fallbackIndexId`.
 3. The last step of `RepositoryIndexing` starts one `IndexDeletion` for each earlier index of the repository:
-   - Delete the vectors by id, in pages. The `chunks` rows supply the ids, so they go after the vectors.
-   - Delete the `indexes` row last.
+   - Delete the vectors by id, in pages. The `source_chunks` rows supply the ids, so they go after the vectors.
+   - Delete the `repository_indexes` row last.
 
 The cleanup cron starts the same Workflow.
 
@@ -281,7 +281,7 @@ The cleanup cron starts the same Workflow.
 1. The gateway applies the rate limit and loads the index.
 2. It queries `chunks_fts` for the symbol name in the `identifiers` column, in that index. The limit is 50 rows.
 3. It splits the rows into two lists:
-   - Definitions: rows where `chunks.symbol` equals the name
+   - Definitions: rows where `source_chunks.symbol` equals the name
    - Usages: the other rows
 4. It returns the definitions first, then the usages, each with the path, the line range, and the GitHub link.
 
@@ -289,8 +289,8 @@ The trace calls no model, so it costs no tokens.
 
 ### Scenario E: The user opens a shared answer
 
-1. The browser loads `/a/:id`, then calls `GET /v1/questions/:id`.
-2. The gateway reads the `questions` row and returns the question, the answer, and the citations.
+1. The browser loads `/a/:id`, then calls `GET /api/v1/questions/:id`.
+2. The gateway reads the `answered_questions` row and returns the question, the answer, and the citations.
 3. An unknown id returns `404`.
 
 ---

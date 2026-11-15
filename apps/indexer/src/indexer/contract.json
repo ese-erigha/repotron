@@ -1,0 +1,93 @@
+{
+  "chunk": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "minLength": 1
+      },
+      "seq": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+      },
+      "path": {
+        "type": "string",
+        "minLength": 1
+      },
+      "language": {
+        "type": "string",
+        "enum": [
+          "python",
+          "typescript",
+          "javascript",
+          "go",
+          "java",
+          "rust",
+          "markdown",
+          "text"
+        ]
+      },
+      "symbol": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "kind": {
+        "type": "string",
+        "enum": [
+          "function",
+          "method",
+          "class",
+          "interface",
+          "type",
+          "module",
+          "heading",
+          "window"
+        ]
+      },
+      "startLine": {
+        "type": "integer",
+        "exclusiveMinimum": 0,
+        "maximum": 9007199254740991
+      },
+      "endLine": {
+        "type": "integer",
+        "exclusiveMinimum": 0,
+        "maximum": 9007199254740991
+      },
+      "content": {
+        "type": "string"
+      },
+      "header": {
+        "type": "string"
+      },
+      "identifiers": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "id",
+      "seq",
+      "path",
+      "language",
+      "symbol",
+      "kind",
+      "startLine",
+      "endLine",
+      "content",
+      "header",
+      "identifiers"
+    ],
+    "additionalProperties": false
+  },
+  "limits": {
+    "maxChunkTokens": 1500,
+    "lineWindow": 60,
+    "lineOverlap": 10,
+    "chunkBatchSize": 500,
+    "fileMaxBytes": 1048576
+  }
+}

@@ -1,0 +1,61 @@
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { describe, it } from 'node:test'
+
+import { buildContract } from './contract.ts'
+import { formatChunkInput, formatQueryInput } from './formats.ts'
+import { buildGithubLineUrl, parseRepositoryLink } from './links.ts'
+import { readCitedNumbers } from './citations.ts'
+
+describe('parseRepositoryLink', () => {
+  it('when the link is not a GitHub repository, then it returns no link', () => {
+    assert.equal(parseRepositoryLink('https://gitlab.com/owner/repo'), undefined)
+    assert.equal(parseRepositoryLink('https://github.com/owner'), undefined)
+  })
+
+  it('when the link has a trailing slash or a .git suffix, then it returns the repository', () => {
+    assert.deepEqual(parseRepositoryLink('https://github.com/owner/repo.git/'), {
+      owner: 'owner',
+      name: 'repo',
+    })
+  })
+})
+
+describe('formatChunkInput', () => {
+  it('when a chunk has a header and content, then the input uses the title and text form', () => {
+    assert.equal(formatChunkInput('src/app.py App', 'class App:'), 'title: src/app.py App | text: class App:')
+  })
+})
+
+describe('formatQueryInput', () => {
+  it('when a question is embedded, then the input uses the search task prefix', () => {
+    assert.equal(formatQueryInput('Where is main?'), 'task: search result | query: Where is main?')
+  })
+})
+
+describe('buildGithubLineUrl', () => {
+  it('when a citation has a line range, then the link uses the commit and those lines', () => {
+    const url = buildGithubLineUrl({
+      owner: 'owner',
+      name: 'repo',
+      commitSha: 'abc',
+      path: 'src/app.py',
+      startLine: 4,
+      endLine: 9,
+    })
+    assert.equal(url, 'https://github.com/owner/repo/blob/abc/src/app.py#L4-L9')
+  })
+})
+
+describe('readCitedNumbers', () => {
+  it('when a marker is outside the source list, then it is ignored', () => {
+    assert.deepEqual(readCitedNumbers('See [1] and [9].', 2), [1])
+  })
+})
+
+describe('buildContract', () => {
+  it('when the contract file is committed, then it matches the generated contract', () => {
+    const committed = readFileSync(new URL('../../../apps/indexer/src/indexer/contract.json', import.meta.url), 'utf8')
+    assert.equal(committed, buildContract())
+  })
+})

@@ -114,7 +114,7 @@ One FastAPI app. One module for each step of the job. The chunk contract comes f
 
 A route is a plural noun. The HTTP method is the action.
 
-- `GET` reads a collection or one item. The id is a path parameter.
+- `GET` reads a collection or one item. The id is a path parameter. The public prefix is `/api/v1`. `/health` stays at the root.
 - `POST` creates a resource. An action that is not create, update, or delete is a noun sub-path.
 - `PATCH` changes part of one resource. `DELETE` removes it.
 - `200` for a read, `201` for a create, `400` for validation, `403` for a failed Turnstile check, `404` for a missing resource, `409` for an index that is not ready, `429` for a rate limit, `500` for an unexpected failure, and `503` for a GitHub failure.
@@ -126,8 +126,8 @@ app.post('/api/createIndex', ...)
 
 // ✅ GOOD
 app.get('/health', ...)
-app.post('/v1/indexes', ...)
-app.post('/v1/indexes/:id/questions', ...)
+app.post('/api/v1/indexes', ...)
+app.post('/api/v1/indexes/:id/questions', ...)
 ```
 
 ## Conventions
@@ -144,7 +144,7 @@ app.post('/v1/indexes/:id/questions', ...)
 - **Types** — a type stays in the file of the function that owns it. A shared Worker binding lives in one bindings file, such as `apps/pipeline/src/bindings.ts`. Do not collect unrelated types into a types file.
 - **Config** — the Worker entry stores the env with `AsyncLocalStorage.run`. Gateway functions call `getConfig()`. Pipeline functions call `getPipelineConfig()`. Do not pass `GatewayEnv` or `PipelineEnv` into a function. Workers do not support `enterWith`. Secrets stay on the Worker env. They are not in `cloudflare.config.ts`.
 - **Async** — write `async` functions and use `await`. Do not use `.then`, `.catch`, `new Promise`, or a callback parameter.
-- **Database** — a repository method runs one statement. Do not query the database inside a loop. Load the rows in one query, then work on that list. `ChunkRepository.insertBatch` is the one `db.batch()` call.
+- **Database** — a repository method runs one statement. Do not query the database inside a loop. Load the rows in one query, then work on that list. `SourceChunkRepository.insertBatch` is the one `db.batch()` call.
 - **Straight-line calls** — one `await` per statement. Name the result, then pass that name.
 - **Product thresholds** such as `CONTEXT_CHUNKS` live in `packages/domain`. Do not hardcode a second copy.
 - **Log** — call `log` from the `log` package. It forwards the arguments to `console`. The `log` package is the only code that calls `console`.

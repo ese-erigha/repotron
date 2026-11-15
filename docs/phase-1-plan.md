@@ -51,21 +51,21 @@ This section is the map. The detail sections hold the exact rules. When this sec
 
 ```
 Index a repository
-  Browser ─► gateway POST /v1/indexes
+  Browser ─► gateway POST /api/v1/indexes
       Turnstile → rate limit → GitHub checks → insert queued row
       ─► create RepositoryIndexing instance <indexId>
   RepositoryIndexing (pipeline)
       parsing → Indexer container POST /index → JSONL batches in R2 → destroy the container
       embedding → for each batch: D1 rows → embeddings → Vectorize upsert
       wait for Vectorize → ready → delete batches → start IndexDeletion for earlier indexes
-  Browser polls GET /v1/indexes/:id every 2 seconds
+  Browser polls GET /api/v1/indexes/:id every 2 seconds
 
 Ask a question
-  Browser ─► gateway POST /v1/indexes/:id/questions
+  Browser ─► gateway POST /api/v1/indexes/:id/questions
       rate limit → embed the question → Vectorize topK 8 → load chunk rows
       ─► event retrieval
       ─► OpenRouter stream through AI Gateway ─► events token … token
-      ─► event done → write the questions row (waitUntil)
+      ─► event done → write the answered_questions row (waitUntil)
 
 Clean up
   cron 0 4 * * * (pipeline) → find stale indexes → start IndexDeletion for each
@@ -74,17 +74,17 @@ Clean up
 
 ### 2.3 Data
 
-D1 database `repotron-staging-db` holds 4 tables. The migration file is `infra/migrations/0001_phase1_initial.sql`. Section 9 gives each column.
+D1 database `repotron-staging-db` holds 4 tables. The migration file is `infra/migrations/0000_phase1_initial.sql`. Section 9 gives each column.
 
 ```
-github_repositories ─< indexes ─< chunks
-questions              (index_id with no foreign key, so a share link outlives its index)
+github_repositories ─< repository_indexes ─< source_chunks
+answered_questions     (index_id with no foreign key, so a share link outlives its index)
 ```
 
 - **`github_repositories`** — one row for each GitHub repository. Written by the intake. Read by the intake and the recent list.
-- **`indexes`** — one row for each repository at one commit. Written by the intake, both Workflows, and the question path (`last_question_at`). Read by every route.
-- **`chunks`** — one row for each chunk. Written by `RepositoryIndexing`. Deleted by `IndexDeletion`. Read by the question path.
-- **`questions`** — one row for each answered question. Written by the question path. Read by the share page.
+- **`repository_indexes`** — one row for each repository at one commit. Written by the intake, both Workflows, and the question path (`last_question_at`). Read by every route.
+- **`source_chunks`** — one row for each source chunk. Written by `RepositoryIndexing`. Deleted by `IndexDeletion`. Read by the question path.
+- **`answered_questions`** — one row for each answered question. Written by the question path. Read by the share page.
 
 Other stores:
 
@@ -97,12 +97,12 @@ Other stores:
 All endpoints are on the gateway, at its `workers.dev` URL. The browser calls them with `fetch`, and the gateway answers with CORS headers for the web origin. Section 10 gives the exact steps. Every JSON error uses the envelope `{ "error": { "code", "message" } }`.
 
 - **`GET /health`** — returns `200` with `{ "ok": true }`.
-- **`POST /v1/indexes`** — starts an index job, or returns the existing index. Guard: Turnstile and the hourly index limit.
-- **`GET /v1/indexes`** — lists the 10 most recent ready indexes for the home screen.
-- **`GET /v1/indexes/:id`** — returns the status of one index.
-- **`POST /v1/indexes/:id/questions`** — answers one question as an event stream. Guard: the hourly question limit.
-- **`GET /v1/questions/:id`** — returns one shared answer.
-- **Any other `/v1/*` path** — `404` with the code `not_found`.
+- **`POST /api/v1/indexes`** — starts an index job, or returns the existing index. Guard: Turnstile and the hourly index limit.
+- **`GET /api/v1/indexes`** — lists the 10 most recent ready indexes for the home screen.
+- **`GET /api/v1/indexes/:id`** — returns the status of one index.
+- **`POST /api/v1/indexes/:id/questions`** — answers one question as an event stream. Guard: the hourly question limit.
+- **`GET /api/v1/questions/:id`** — returns one shared answer.
+- **Any other `/api/v1/*` path** — `404` with the code `not_found`.
 
 The web Worker has 3 screen routes: `/`, `/r/:owner/:repo`, and `/a/:id`. Every other path also returns the app, and the app shows its not-found screen.
 
@@ -151,22 +151,22 @@ The user approved these decisions on 2026-11-14. `architecture.md`, `prd.md`, an
 ### Decision C: Names that change
 
 - The table `repositories` becomes `github_repositories`. In code, "repository" also means a data-access class.
-- The Workflow `IndexRepository` becomes `RepositoryIndexing`. The data-access class for `indexes` is `IndexRepository`, so the old Workflow name collides with it.
+- The Workflow `IndexRepository` becomes `RepositoryIndexing`. The data-access class for `repository_indexes` is `RepositoryIndexRepository`.
 - A new Workflow, `IndexDeletion`, deletes one index. Scenario C and the cron both start it. A large index has too many pages for one cron run.
 
 ### Decision D: Index status and retry
 
 - `INDEX_STATUS`: `queued`, `parsing`, `embedding`, `ready`, `failed`, and `deleting`.
 - A failed index keeps its row. A new request for the same commit resets the row to `queued` and calls `restart()` on the Workflow instance. That is the retry of US-1.5.
-- While a new index runs, `GET /v1/indexes/:id` returns `fallbackIndexId`, the newest ready index of the same repository. The ask screen uses it (US-1.6).
+- While a new index runs, `GET /api/v1/indexes/:id` returns `fallbackIndexId`, the newest ready index of the same repository. The ask screen uses it (US-1.6).
 
 ### Decision E: The stream has 4 events
 
-The PRD names `retrieval`, `token`, and `done`. A model failure after the first token needs a fourth event: `error`, with the error code and message. The answer then stops, and no `questions` row is written.
+The PRD names `retrieval`, `token`, and `done`. A model failure after the first token needs a fourth event: `error`, with the error code and message. The answer then stops, and no `answered_questions` row is written.
 
 ### Decision F: The ask screen route carries the index id
 
-The ask screen URL is `/r/:owner/:repo?index=<indexId>`. A reload reads `GET /v1/indexes/:id`. It needs no Turnstile token and uses none of the 5 index requests of the hour. Without the query value, the screen shows Turnstile and posts the link again.
+The ask screen URL is `/r/:owner/:repo?index=<indexId>`. A reload reads `GET /api/v1/indexes/:id`. It needs no Turnstile token and uses none of the 5 index requests of the hour. Without the query value, the screen shows Turnstile and posts the link again.
 
 ### Decision G: Python tooling
 
@@ -208,7 +208,7 @@ repotron/
 │   ├── sync-migration-journal.mjs      # copy from Mailer, rename the env var
 │   └── ensure-resources-staging.sh     # creates the R2 bucket when missing
 ├── infra/migrations/
-│   ├── 0001_phase1_initial.sql
+│   ├── 0000_phase1_initial.sql
 │   └── meta/_journal.json
 ├── docs/
 ├── apps/
@@ -447,7 +447,7 @@ Each create command passed a `--dry-run`. Each `get` returns `404 Not Found` for
 ### Stage 6: Database schema
 
 - **Build**
-  - `infra/migrations/0001_phase1_initial.sql` and its journal (section 9)
+  - `infra/migrations/0000_phase1_initial.sql` and its journal (section 9)
   - The Drizzle tables and the 4 repository classes in `packages/db` (section 13)
   - The `migrate` job in the workflow
 - **Local check:** the repository unit tests pass on a fake D1, and `pnpm db:sync` changes no file.
@@ -475,20 +475,20 @@ Each create command passed a `--dry-run`. Each `get` returns `404 Not Found` for
   - `apps/web` with its config (section 8), `public-config.ts` with the gateway URL and the site key, and a home screen that calls `GET /health` through the `HttpClient` in `services/api/`. [phase-1-ui-plan.md](phase-1-ui-plan.md), section 10, lists the UI work of each stage.
   - The `deploy-gateway` job, after `deploy-pipeline`, and the `deploy-web` job
 - **Local check:** unit tests prove 4 rules:
-  - An unknown `/v1/*` path returns the `404` envelope.
+  - An unknown `/api/v1/*` path returns the `404` envelope.
   - A request from `APP_ORIGIN` gets the CORS headers, and a request from another origin gets none.
   - A preflight `OPTIONS` returns `204`.
   - `RateLimiter` refuses the sixth index request in one hour and returns the seconds until the next hour.
 - **You, after the merge:** Set the 3 gateway secrets with the same command: `TURNSTILE_SECRET`, `GITHUB_TOKEN`, and `OPENROUTER_API_KEY`. The web Worker has no secret.
 - **Staging check**
-  - `<gateway URL>/v1/unknown` returns the `404` envelope.
+  - `<gateway URL>/api/v1/unknown` returns the `404` envelope.
   - `<web URL>/r/a/b` returns the app, not a `404`.
   - The home screen shows the health result, with no CORS error in the browser console.
 
 ### Stage 9: Intake (F-1)
 
 - **Build**
-  - `POST /v1/indexes`, `GET /v1/indexes`, and `GET /v1/indexes/:id` (section 10), with `github-repository.ts` and `verify-turnstile.ts`
+  - `POST /api/v1/indexes`, `GET /api/v1/indexes`, and `GET /api/v1/indexes/:id` (section 10), with `github-repository.ts` and `verify-turnstile.ts`
   - A `RepositoryIndexing` that only marks `parsing`
   - The home screen with Turnstile and the recent list, and the status view (section 14)
 - **Local check:** use case tests with fakes prove each rule of the route:
@@ -529,22 +529,22 @@ Each create command passed a `--dry-run`. Each `get` returns `404 Not Found` for
 
 ### Stage 12: Ask (F-4 to F-7)
 
-- **Build:** `POST /v1/indexes/:id/questions` (section 10) with the retrieval, the prompt, the stream, and the `questions` row. The ask panel and the citation panel (section 14).
+- **Build:** `POST /api/v1/indexes/:id/questions` (section 10) with the retrieval, the prompt, the stream, and the `answered_questions` row. The ask panel and the citation panel (section 14).
 - **Local check:** unit tests prove 4 rules:
   - The events arrive in the order `retrieval`, `token`, `done`.
-  - A model failure sends `error` and writes no `questions` row.
+  - A model failure sends `error` and writes no `answered_questions` row.
   - An injected instruction in a chunk stays inside the `<chunk>` tags, after the rules (US-3.5, Phase 1 check).
   - An index that is not `ready` returns `409`.
 - **Staging check**
   - A question about a known function cites that function. The GitHub link opens the correct lines at the commit.
   - A question that the repository cannot answer returns "I did not find this in the repository."
-  - The `questions` row holds both model ids, the token counts, and the 3 latency values.
+  - The `answered_questions` row holds both model ids, the token counts, and the 3 latency values.
   - The AI Gateway log shows 1 embedding call and 1 OpenRouter call for the question.
   - The `retrieval` event arrives before the first token (US-3.1). Record the first-token time of 10 questions.
 
 ### Stage 13: Share and presets (F-19, F-20)
 
-- **Build:** `GET /v1/questions/:id`, the answer page, the Share button, and the 2 presets
+- **Build:** `GET /api/v1/questions/:id`, the answer page, the Share button, and the 2 presets
 - **Local check:** unit tests prove that each preset adds its section list, and that an unknown question id returns `404`.
 - **Staging check**
   - A shared link opens in a private browser window.
@@ -638,9 +638,9 @@ The `Indexer` class sets `envVars` from the pipeline env: `GITHUB_TOKEN`, `R2_EN
 
 ## 9. Database schema
 
-- **Files.** `infra/migrations/0001_phase1_initial.sql` holds the SQL. `packages/db/src/schema` holds the Drizzle tables. Write both by hand so they match, column for column.
+- **Files.** `infra/migrations/0000_phase1_initial.sql` holds the SQL. `packages/db/src/schema` holds the Drizzle tables. Write both by hand so they match, column for column.
 - **Types.** Times are integers in epoch milliseconds (UTC). Ids are text. The SQL sets no default.
-- **Foreign keys.** No `ON DELETE CASCADE`. `IndexDeletion` deletes `chunks` in pages, because one statement must not delete hundreds of thousands of rows.
+- **Foreign keys.** No `ON DELETE CASCADE`. `IndexDeletion` deletes `source_chunks` in pages, because one statement must not delete hundreds of thousands of rows.
 - **Closed sets.** No CHECK constraints. Zod validates the values from the `as const` objects in `packages/domain`.
 
 ### Table `github_repositories`
@@ -653,7 +653,7 @@ The `Indexer` class sets `envVars` from the pipeline env: `GITHUB_TOKEN`, `R2_EN
 
 The intake upserts the row on each request, so a renamed repository keeps its id and gets the new name.
 
-### Table `indexes`
+### Table `repository_indexes`
 
 - `id` — text, primary key. `<repositoryId>-<commitSha>`. It is also the Workflow instance id and the Vectorize namespace.
 - `repository_id` — text, not null, foreign key to `github_repositories.id`
@@ -673,10 +673,10 @@ The intake upserts the row on each request, so a renamed repository keeps its id
 - Only the Workflows change `status`, except two cases. The intake inserts `queued` and resets `failed` to `queued`.
 - A question reads only a `ready` index.
 
-### Table `chunks`
+### Table `source_chunks`
 
 - `id` — text, primary key. `<indexId>:<seq>`. It is also the vector id.
-- `index_id` — text, not null, foreign key to `indexes.id`
+- `index_id` — text, not null, foreign key to `repository_indexes.id`
 - `seq` — integer, not null. The order from the indexer.
 - `path` — text, not null. The path inside the repository.
 - `language` — text, not null. One of `LANGUAGE`.
@@ -692,7 +692,7 @@ The intake upserts the row on each request, so a renamed repository keeps its id
 - The insert ignores a duplicate primary key, so a retried batch step writes no second row.
 - A file is 1 MB or less, so a row stays under the 2 MB row limit of D1.
 
-### Table `questions`
+### Table `answered_questions`
 
 - `id` — text, primary key. 128 random bits as 32 hex characters.
 - `index_id` — text, not null. No foreign key.
@@ -748,7 +748,7 @@ The intake upserts the row on each request, so a renamed repository keeps its id
 - The object stores one count for each kind and window.
 - It allows the call when the count is below the limit (`INDEX_REQUESTS_PER_HOUR` 5, `QUESTIONS_PER_HOUR` 30). Otherwise it returns the seconds until the next hour.
 
-### `POST /v1/indexes`
+### `POST /api/v1/indexes`
 
 Body: `{ url, turnstileToken }`.
 
@@ -766,29 +766,29 @@ Body: `{ url, turnstileToken }`.
    - When the row exists and is not `failed`, return `200` with the index view.
    - When the row is `failed`, reset it to `queued`, call `restart()` on the Workflow instance, and return `200`.
 8. Call `GET /repos/{owner}/{repo}/git/trees/{sha}?recursive=1`. Count the `blob` entries. A truncated tree, or a count over `REPOSITORY_MAX_FILES` (20,000), returns `repository_too_large`.
-9. Upsert `github_repositories`. Insert the `indexes` row as `queued`.
+9. Upsert `github_repositories`. Insert the `repository_indexes` row as `queued`.
 10. Create the `RepositoryIndexing` instance with the id and the params in section 2.5.
     - An error that says the id exists means a parallel request already started it. Treat it as done.
     - Any other error marks the row `failed`, with the stage `queued`, and returns `503`.
 11. Return `201` with the index view.
 
-**Index view** (also from `GET /v1/indexes/:id`):
+**Index view** (also from `GET /api/v1/indexes/:id`):
 
 ```
 { id, repository: { owner, name }, commitSha, status, failedStage, failureReason,
   fileCount, chunkCount, fallbackIndexId, createdAt, readyAt }
 ```
 
-### `GET /v1/indexes/:id`
+### `GET /api/v1/indexes/:id`
 
 - Unknown id: `404`.
 - `fallbackIndexId` is the id of the newest `ready` index of the same repository. It is set only when this index is not `ready`. Otherwise it is null.
 
-### `GET /v1/indexes`
+### `GET /api/v1/indexes`
 
 - Returns `{ indexes: IndexView[] }`: the `RECENT_INDEX_COUNT` (10) newest `ready` indexes, by `ready_at`.
 
-### `POST /v1/indexes/:id/questions`
+### `POST /api/v1/indexes/:id/questions`
 
 Body, one of these:
 
@@ -813,7 +813,7 @@ Steps:
 7. **Stream** (`stream-answer.ts`): call OpenRouter with the request rules of Decision B. Forward each content delta as a `token` event. Read `usage` from the last chunk.
    - On a model error, send `error` and end the stream.
 8. Send `done` with `{ questionId, inputTokens, outputTokens, retrievalMs, firstTokenMs, answerMs }`.
-9. With `ctx.waitUntil`, insert the `questions` row and set `indexes.last_question_at`. `citations` holds only the chunks whose numbers appear in the answer. `readCitedNumbers` finds them and ignores a number that is out of range.
+9. With `ctx.waitUntil`, insert the `answered_questions` row and set `repository_indexes.last_question_at`. `citations` holds only the chunks whose numbers appear in the answer. `readCitedNumbers` finds them and ignores a number that is out of range.
 
 **Event format:**
 
@@ -824,7 +824,7 @@ event: done        data: { questionId, inputTokens, outputTokens, retrievalMs, f
 event: error       data: { code, message }
 ```
 
-### `GET /v1/questions/:id`
+### `GET /api/v1/questions/:id`
 
 - Returns `{ id, repositoryFullName, commitSha, preset, question, answer, citations, createdAt }`.
 - Unknown id: `404`.
@@ -873,7 +873,7 @@ Each step does one side effect and retries on its own: 3 retries, exponential ba
    - List up to `DELETE_PAGE_SIZE` (500) chunk ids of the index, ordered by id.
    - Call `deleteByIds` on `CHUNK_VECTORS` with those ids.
    - Delete the chunk rows with `index_id = ? AND id <= <last id of the page>`. The statement has 2 parameters.
-3. **Delete the index row.** Leave the `questions` rows.
+3. **Delete the index row.** Leave the `answered_questions` rows.
 
 ### Cron `0 4 * * *`
 
@@ -933,10 +933,10 @@ Python 3.12 and uv. Dependencies: `fastapi`, `uvicorn`, `tree-sitter`, `tree-sit
   - Contract: the build writes `apps/indexer/src/indexer/contract.json` with `z.toJSONSchema` and the chunk limits. A unit test fails when the committed file differs from the output.
   - Phase 3 adds `RRF_K`, `RETRIEVAL_TOP_K`, and the confidence thresholds. Phase 1 does not.
 - **`packages/db`**
-  - Drizzle tables that match `0001_phase1_initial.sql`
-  - One class for each table: `GithubRepositoryRepository`, `IndexRepository`, `ChunkRepository`, and `QuestionRepository`. `RepotronRepositories` holds all 4.
+  - Drizzle tables that match `0000_phase1_initial.sql`
+  - One class for each table: `GithubRepositoryRepository`, `RepositoryIndexRepository`, `SourceChunkRepository`, and `AnsweredQuestionRepository`. `RepotronRepositories` holds all 4.
   - Method names follow the Mailer rule: Get, Find, List, and one named action for each write. Examples: `insertQueued`, `markParsing`, `markReady`, `markFailed`, `resetToQueued`, `recordQuestion`, `insertBatch`, `listIdPage`, and `deleteThrough`.
-  - `ChunkRepository.insertBatch` is the one method that runs a `db.batch()`. Every other method runs one statement.
+  - `SourceChunkRepository.insertBatch` is the one method that runs a `db.batch()`. Every other method runs one statement.
 - **`packages/log`** — copy from Mailer.
 
 ---
@@ -1006,7 +1006,7 @@ These rules hold in every stage. A change that breaks one is a defect.
   - The size limits run before any job.
 - **Data**
   - D1 and the logs never hold a token, a secret, or an IP address.
-  - A share page needs only its `questions` row.
+  - A share page needs only its `answered_questions` row.
   - R2 batches live only until the index is ready or failed.
 - **Cost**
   - One index exists for each repository and commit.
@@ -1031,3 +1031,21 @@ These rules hold in every stage. A change that breaks one is a defect.
 - **Unauthenticated AI Gateway.** Anyone with the gateway URL can send traffic to it. Each call still needs the OpenRouter key or Workers AI billing on this account. Turn on authentication before a public launch.
 - **`MAX_CHUNK_TOKENS`.** The value 1,500 is a starting guess. Phase 2 tunes it with the eval.
 - **D1 size.** One database stops at 10 GB. The 30-day cleanup is the only control. Measure the size on staging.
+
+---
+
+## 18. Worker secrets
+
+Set each secret after the Worker exists.
+
+- **`repotron-staging-gateway`**
+  - `TURNSTILE_SECRET`
+  - `GITHUB_TOKEN`
+  - `OPENROUTER_API_KEY`
+- **`repotron-staging-pipeline`**
+  - `GITHUB_TOKEN`
+  - `R2_ACCESS_KEY_ID`
+  - `R2_SECRET_ACCESS_KEY`
+- **`repotron-staging-web`**
+  - none
+

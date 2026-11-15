@@ -11,3 +11,9 @@ coverage
 .DS_Store
 .vite
 .cloudflare
+.venv
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/

@@ -1,0 +1,27 @@
+{
+  "name": "pipeline",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "lint": "oxlint",
+    "typecheck": "tsc -p tsconfig.json --noEmit --pretty false",
+    "test": "node --test $(find src -name '*.test.ts')"
+  },
+  "dependencies": {
+    "@cloudflare/containers": "^0.3.2",
+    "db": "workspace:*",
+    "log": "workspace:*",
+    "repotron-domain": "workspace:*",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "2.0.0-beta.v.15",
+    "@types/node": "^24.19.2",
+    "cf": "1.0.0-beta.30",
+    "oxlint": "^1.88.0",
+    "typescript": "~6.0.3",
+    "vite": "^8.3.8"
+  }
+}

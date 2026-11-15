@@ -20,5 +20,8 @@
     "drizzle-kit": "^0.31.11",
     "husky": "^9.1.7",
     "turbo": "^2.6.1"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["better-sqlite3", "esbuild", "workerd"]
   }
 }
