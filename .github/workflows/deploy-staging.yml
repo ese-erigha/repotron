@@ -208,7 +208,19 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: pnpm exec cf deploy --message "${{ github.sha }}"
+        run: |
+          # The Worker record can 404 for a few seconds after the first upload.
+          attempt=1
+          while [ "$attempt" -le 3 ]; do
+            if pnpm exec cf deploy --message "${{ github.sha }}"; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              exit 1
+            fi
+            sleep 15
+            attempt=$((attempt + 1))
+          done
 
   summary:
     runs-on: ubuntu-latest
