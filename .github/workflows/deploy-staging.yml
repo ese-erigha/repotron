@@ -180,7 +180,7 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: pnpm exec cf deploy --message "${{ github.sha }}"
+        run: pnpm exec cf deploy --force --message "${{ github.sha }}"
 
   deploy-gateway:
     runs-on: ubuntu-latest
@@ -210,7 +210,7 @@ jobs:
           # The Worker record can 404 for a few seconds after the first upload.
           attempt=1
           while [ "$attempt" -le 3 ]; do
-            if pnpm exec cf deploy --message "${{ github.sha }}"; then
+            if pnpm exec cf deploy --force --message "${{ github.sha }}"; then
               exit 0
             fi
             if [ "$attempt" -eq 3 ]; then
