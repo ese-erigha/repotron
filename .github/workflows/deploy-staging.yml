@@ -1,0 +1,150 @@
+name: Deploy Staging
+
+on:
+  push:
+    branches:
+      - develop
+  workflow_dispatch:
+    inputs:
+      apply_migrations:
+        description: "Apply database migrations?"
+        required: true
+        type: boolean
+        default: true
+      force_deploy_gateway:
+        description: "Deploy the gateway Worker even when gateway files did not change?"
+        required: false
+        type: boolean
+        default: false
+      force_deploy_pipeline:
+        description: "Deploy the pipeline Worker even when pipeline files did not change?"
+        required: false
+        type: boolean
+        default: false
+      force_deploy_web:
+        description: "Deploy the web Worker even when web files did not change?"
+        required: false
+        type: boolean
+        default: false
+
+env:
+  CF_SEND_TELEMETRY: "false"
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    name: Detect changes
+    outputs:
+      migrations: ${{ steps.changes.outputs.migrations }}
+      gateway: ${{ steps.changes.outputs.gateway }}
+      pipeline: ${{ steps.changes.outputs.pipeline }}
+      web: ${{ steps.changes.outputs.web }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changes
+        id: changes
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "migrations=${{ inputs.apply_migrations }}" >> $GITHUB_OUTPUT
+            echo "gateway=${{ inputs.force_deploy_gateway }}" >> $GITHUB_OUTPUT
+            echo "pipeline=${{ inputs.force_deploy_pipeline }}" >> $GITHUB_OUTPUT
+            echo "web=${{ inputs.force_deploy_web }}" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          if [ "${{ github.event.before }}" == "0000000000000000000000000000000000000000" ]; then
+            echo "migrations=true" >> $GITHUB_OUTPUT
+            echo "gateway=true" >> $GITHUB_OUTPUT
+            echo "pipeline=true" >> $GITHUB_OUTPUT
+            echo "web=true" >> $GITHUB_OUTPUT
+            echo "First push to branch — will run applicable jobs"
+            exit 0
+          fi
+
+          changed_files=$(git diff --name-only ${{ github.event.before }}..${{ github.sha }})
+
+          if echo "$changed_files" | grep -qE '^infra/migrations/.*\.sql$'; then
+            echo "migrations=true" >> $GITHUB_OUTPUT
+          else
+            echo "migrations=false" >> $GITHUB_OUTPUT
+          fi
+
+          if echo "$changed_files" | grep -qE '^(apps/gateway/|packages/|pnpm-lock\.yaml|\.github/workflows/deploy-staging\.yml)'; then
+            echo "gateway=true" >> $GITHUB_OUTPUT
+          else
+            echo "gateway=false" >> $GITHUB_OUTPUT
+          fi
+
+          if echo "$changed_files" | grep -qE '^(apps/pipeline/|apps/indexer/|packages/|pnpm-lock\.yaml|\.github/workflows/deploy-staging\.yml)'; then
+            echo "pipeline=true" >> $GITHUB_OUTPUT
+          else
+            echo "pipeline=false" >> $GITHUB_OUTPUT
+          fi
+
+          if echo "$changed_files" | grep -qE '^(apps/web/|packages/|pnpm-lock\.yaml|\.github/workflows/deploy-staging\.yml)'; then
+            echo "web=true" >> $GITHUB_OUTPUT
+          else
+            echo "web=false" >> $GITHUB_OUTPUT
+          fi
+
+  test:
+    runs-on: ubuntu-latest
+    name: Lint, typecheck, test, and build
+    needs: [detect-changes]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm turbo run lint typecheck test build
+
+  ensure-resources:
+    runs-on: ubuntu-latest
+    name: Ensure CI resources
+    needs: [test]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Create missing R2, Vectorize, and AI Gateway resources
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: pnpm exec bash scripts/ensure-resources-staging.sh
+
+  summary:
+    runs-on: ubuntu-latest
+    name: Staging summary
+    needs: [detect-changes, test, ensure-resources]
+    if: always()
+    steps:
+      - name: Workflow summary
+        run: |
+          echo "## Staging summary"
+          if [ "${{ needs.test.result }}" != "success" ]; then
+            echo "- Checks: FAILED"
+            exit 1
+          fi
+          echo "- Checks: SUCCESS"
+
+          if [ "${{ needs.ensure-resources.result }}" != "success" ]; then
+            echo "- CI resources: FAILED"
+            exit 1
+          fi
+          echo "- CI resources: SUCCESS"
+
+          echo "- Migrations requested: ${{ needs.detect-changes.outputs.migrations }}"
+          echo "- Gateway changes: ${{ needs.detect-changes.outputs.gateway }}"
+          echo "- Pipeline changes: ${{ needs.detect-changes.outputs.pipeline }}"
+          echo "- Web changes: ${{ needs.detect-changes.outputs.web }}"

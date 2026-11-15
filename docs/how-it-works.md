@@ -14,7 +14,8 @@ Repotron answers a question about a public GitHub repository. The answer cites a
 - When no index exists, the status screen shows the stage.
   - The stages are queued, parsing, embedding, and ready.
   - The screen refreshes every 2 seconds.
-  - A failure shows the stage and the reason.
+  - A failure shows the stage and the reason. The Retry button starts the same job again.
+  - A reload of the page keeps the same job, so the user does not repeat the Turnstile check.
 - Repotron downloads the files at that commit.
 - Tree-sitter reads the code and splits it into chunks.
   - A function, a method, or a class stays whole in one chunk.
@@ -26,6 +27,8 @@ Repotron answers a question about a public GitHub repository. The answer cites a
   - Repotron stores the chunk text and the numbers.
 - The status changes to ready. The user can ask a question.
 - A bad link, a private repository, or a repository over a size limit returns an error. No job starts.
+- When the default branch has a new commit, Repotron indexes that commit. Questions use the older index until the new one is ready. Then Repotron deletes the older index.
+- Repotron deletes an index that nobody asked about for 30 days. A share link still works after that.
 
 ---
 

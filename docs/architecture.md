@@ -2,12 +2,13 @@
 
 ## 1. Summary
 
-Repotron runs on Cloudflare. Two TypeScript Workers and one Python container do the work.
+Repotron runs on Cloudflare. Three TypeScript Workers and one Python container do the work. [phase-1-plan.md](phase-1-plan.md) holds the Phase 1 detail: each column, each route step, and each config value.
 
-- `apps/gateway` is the public Worker. It serves the web app, starts an index job, and answers questions.
-- `apps/pipeline` is the private Worker. It runs the index Workflow, owns the indexer container, and runs the cleanup cron.
+- `apps/web` is a static web app. An assets-only Worker serves it. It holds no API code. The browser calls the gateway over HTTPS.
+- `apps/gateway` is the public API Worker. It starts an index job and answers questions.
+- `apps/pipeline` is the private Worker. It runs the index Workflows, owns the indexer container, and runs the cleanup cron.
 - `apps/indexer` is a Python service in a Cloudflare Container. It downloads the repository, parses it with Tree-sitter, and writes chunks to R2.
-- `apps/evals` is a Python harness. CI runs it. The deploy set omits it.
+- `apps/evals` is a Python harness. CI runs it. The deploy set omits it. Phase 2.
 
 Python runs where the work needs it: parsing and evaluation. Parsing a large repository needs a disk, gigabytes of memory, and minutes of CPU time. A Worker request has none of the three. The Workers use TypeScript, because the `@cloudflare/containers` package and the Hono, Drizzle, and `cf` stack are TypeScript.
 
@@ -17,31 +18,37 @@ Python runs where the work needs it: parsing and evaluation. Parsing a large rep
 
 ```text
 [ Browser ]
-    │  HTTPS, one origin
+    │  HTTPS: static files
+    ▼
+[ apps/web · assets-only Worker ]   React build. No entrypoint, no binding, no secret.
+
+[ Browser ]
+    │  HTTPS: fetch to the gateway origin, with CORS
     ▼
 [ apps/gateway · Worker ]
-  ├── Static assets from apps/web
-  ├── RateLimiter Durable Object  hourly counts for each IP address
-  ├── POST /v1/indexes           Turnstile, rate limit, GitHub check
-  ├── GET  /v1/indexes/:id        status
-  ├── POST /v1/indexes/:id/questions   retrieve, rerank, stream answer
-  ├── GET  /v1/questions/:id      shared answer
+  ├── RateLimiter Durable Object        hourly counts for each IP address
+  ├── POST /v1/indexes                  Turnstile, rate limit, GitHub check
+  ├── GET  /v1/indexes                  recent ready indexes
+  ├── GET  /v1/indexes/:id              status
+  ├── POST /v1/indexes/:id/questions    retrieve, stream answer
+  ├── GET  /v1/questions/:id            shared answer
   ├── GET  /v1/indexes/:id/symbols/:name   symbol trace · Phase 3
-  └── GET  /v1/evals              dashboard data · Phase 4
+  └── GET  /v1/evals                    dashboard data · Phase 4
     │
     │  Workflow binding
     ▼
 [ apps/pipeline · Worker ]
-  ├── IndexRepository Workflow   one repository at one commit
-  ├── Indexer Container class    one instance per index job
-  └── Cron                       delete stale indexes
+  ├── RepositoryIndexing Workflow   one repository at one commit
+  ├── IndexDeletion Workflow        one deleted index
+  ├── Indexer Container class       one instance per index job
+  └── Cron                          start IndexDeletion for stale indexes
     │
     ▼
 [ apps/indexer · Python container ]
   fetch tarball → walk files → Tree-sitter → chunks → R2
 
 Shared stores
-  ├── [ D1 ]          repositories, indexes, chunks, chunks_fts, questions
+  ├── [ D1 ]          github_repositories, indexes, chunks, questions, chunks_fts (Phase 3)
   ├── [ Vectorize ]   one namespace per index
   ├── [ R2 ]          chunk batches, eval reports
   ├── [ Workers AI ]  embeddings, reranker
@@ -54,41 +61,48 @@ Shared stores
 
 ### Tier 1: Web app (`apps/web`)
 
-React and Vite. The gateway serves the build as static assets.
+React and Vite. The Worker `repotron-staging-web` serves the Vite client build as static assets. This is the current Cloudflare guidance: use Workers with static assets, not Pages. The Worker has no `entrypoint`, so no request runs code.
 
-- `/` holds the link box and Turnstile.
-- `/r/:owner/:repo` shows the status, then the ask screen.
+- `notFoundHandling` is `single-page-application`, so a reload of a screen route returns the app.
+- `apps/web/src/config/public-config.ts` holds `API_ORIGIN`, the gateway URL, and the Turnstile site key. Both values are public.
+- `/` holds the link box, Turnstile, and the recent list.
+- `/r/:owner/:repo?index=<indexId>` shows the status, then the ask screen. A reload reads the status by id, so it needs no new Turnstile token.
 - `/a/:id` shows one shared answer.
 - `/dashboard` shows the eval chart. Phase 4.
 
 The ask screen reads the answer stream with `fetch` and a stream reader. The citation panel renders the `retrieval` event before the first token.
 
-### Tier 2: Public Worker (`apps/gateway`)
+### Tier 2: Public API Worker (`apps/gateway`)
 
-Hono. One controller for each route group.
+Hono. One controller for each route group. One use case for each action.
+
+**CORS.** The `cors` middleware from Hono allows one origin, `APP_ORIGIN`, the web Worker URL. It allows `GET`, `POST`, and the `Content-Type` header. It exposes `Retry-After`. The API sets no cookie, so it allows no credentials.
 
 **Index request.**
 
 1. Verify the Turnstile token. Apply the hourly index limit for the IP address.
 2. Parse the link. Call `GET /repos/{owner}/{repo}` on the GitHub API with the server token.
-3. Reject a private repository, a missing repository, and a repository over the size limit.
+3. Reject a missing repository and a private repository with one error. GitHub returns `404` for both. Reject a repository over the size limit.
    - The `size` field of the response is in kilobytes.
 4. Read the head commit sha with `GET /repos/{owner}/{repo}/branches/{default_branch}`. The repository response holds the branch name only.
 5. When `indexes` has a row for that repository and commit, return it.
+   - When that row is `failed`, reset it to `queued` and call `restart()` on its Workflow instance. That is the retry.
 6. Call `GET /repos/{owner}/{repo}/git/trees/{sha}?recursive=1`. Count the `blob` entries. Reject the repository when the count passes the file limit.
    - The count includes files that the indexer skips. So the check is stricter than the limit on indexed files.
    - GitHub sets `truncated` when a tree has more than 100,000 entries. Treat a truncated tree as over the limit.
-7. Otherwise insert the row as `queued`, and create an `IndexRepository` instance with the id `<repositoryId>-<sha>`. A duplicate id fails on create. Treat that error as done.
+7. Otherwise insert the row as `queued`, and create a `RepositoryIndexing` instance with the index id `<repositoryId>-<sha>`. A duplicate id fails on create. Treat that error as done.
 
-**Rate limits.** The `RateLimiter` Durable Object holds the hourly counts. One object serves one IP address. It counts index requests and questions in fixed one-hour windows.
+**Rate limits.** The `RateLimiter` Durable Object holds the hourly counts. One object serves one IP address, from the `CF-Connecting-IP` header. It counts index requests and questions in fixed one-hour windows.
 
 - The Workers rate limit binding does not fit. Its period is 10 or 60 seconds, and each Cloudflare location keeps its own count.
+
+**Status.** `GET /v1/indexes/:id` also returns `fallbackIndexId`: the newest `ready` index of the same repository, while this index is not `ready`. The ask screen uses it during a re-index.
 
 **Question.** Refer to section 4, Scenario B.
 
 ### Tier 3: Private Worker (`apps/pipeline`)
 
-**`IndexRepository` Workflow.** Each step does one side effect and retries on its own.
+**`RepositoryIndexing` Workflow.** Each step does one side effect and retries on its own.
 
 1. Set the status to `parsing`.
 2. Start the container for this index. Call `POST /index` with the owner, the repository, the commit, and the index id. Wait for the batch list.
@@ -96,25 +110,33 @@ Hono. One controller for each route group.
 4. Set the status to `embedding`.
 5. For each batch key, run one step:
    - Read the JSONL batch from R2.
-   - Insert the chunks into D1 with one `db.batch()` call that holds one `INSERT` for each chunk.
+   - Insert the chunks into D1 with one `db.batch()` call that holds one `INSERT … ON CONFLICT DO NOTHING` for each chunk.
      - D1 allows 100 bound parameters and 100 KB in each statement. So one multi-row `INSERT` cannot hold 500 chunks.
      - The 30-second query limit applies to the whole batch.
    - Embed the chunk text with the embedding model.
    - Upsert the vectors into the namespace of the index.
-6. Set the status to `ready`, with the file count and the chunk count.
-7. Delete the earlier index of the same repository. Refer to Scenario C.
+6. Wait for the vectors. Vectorize upserts are asynchronous. The step checks `processedUpToDatetime` from `describe()` against the time of the last upsert, and retries until Vectorize catches up.
+7. Set the status to `ready`, with the file count and the chunk count.
+8. Delete the batches in R2.
+9. Start one `IndexDeletion` for each earlier index of the same repository. Refer to Scenario C.
 
-A failed step after its retries sets the status to `failed`, with the stage and the reason.
+A failed step after its retries sets the status to `failed`, with the stage and the reason. The failure path also stops the container and deletes the batches.
 
-**Indexer Container class.** It extends `Container` from `@cloudflare/containers`. The Durable Object id is the index id, so one job owns one container. The starting instance type is `standard-2`: 1 vCPU, 6 GiB memory, and 12 GB disk.
+**`IndexDeletion` Workflow.** One instance deletes one index.
+
+1. Set the status to `deleting`. A question now gets `409`.
+2. Delete one page of 500 chunks for each step: the vectors by id, then the `chunks` rows. Repeat until no chunk is left.
+3. Delete the `indexes` row. The `questions` rows stay, so each share link still works.
+
+**Indexer Container class.** It extends `Container` from `@cloudflare/containers`. The Durable Object name is the index id, so one job owns one container. The starting instance type is `standard-2`: 1 vCPU, 6 GiB memory, and 12 GB disk. `maxInstances` is 5.
 
 Cloudflare bills memory and disk for each second that the container is awake, including idle time. So the Workflow stops the container as soon as the parse ends. The sleep timeout is 1 minute. That timeout stops a container that step 3 did not reach, such as after a failed parse.
 
-**Cron.** Once each day, it deletes each index with no question for 30 days.
+**Cron.** Once each day, it starts one `IndexDeletion` for each index with no question for 30 days. A large index has too many pages for one cron run, so the cron only starts the Workflows.
 
 ### Tier 4: Python indexer (`apps/indexer`)
 
-Python 3.12, managed with uv. The image holds FastAPI, `tree-sitter`, `tree-sitter-language-pack`, `httpx`, `tiktoken`, and `boto3` for the R2 S3 API.
+Python 3.12. One uv project with its own `uv.lock`, because the Docker build context is `apps/indexer`. The image holds FastAPI, `tree-sitter`, `tree-sitter-language-pack`, `httpx`, `tiktoken`, and `boto3` for the R2 S3 API. Lint is `ruff`. The type check is `mypy --strict`. Tests use `pytest`.
 
 `POST /index` does these steps:
 
@@ -136,23 +158,25 @@ Python 3.12, managed with uv. The image holds FastAPI, `tree-sitter`, `tree-sitt
 - Top-level code between declarations, such as imports and constants, joins into one chunk per file region.
 - A Markdown file splits at its headings. Other files use 60-line windows with a 10-line overlap.
 - Each chunk holds:
-  - `path`, `language`, `symbol`, `kind`, `startLine`, and `endLine`
+  - `id` (`<indexId>:<seq>`), `path`, `language`, `symbol`, `kind`, `startLine`, and `endLine`
   - `content`: the source lines
   - `header`: the path and the enclosing symbol. The embedding input is `title: <header> | text: <content>`.
   - `identifiers`: each identifier in the chunk, plus its parts. `getUserById` gives `get user by id`.
 
 ### Tier 5: Data stores
 
-**D1** holds the rows. Drizzle defines the schema in `packages/db`. The SQL lives in `infra/migrations`.
+**D1** holds the rows. Drizzle defines the schema in `packages/db`. The SQL lives in `infra/migrations`. No foreign key cascades. `IndexDeletion` deletes the chunk rows in pages.
 
-- `repositories` — id, owner, name, default branch, created time
+- `github_repositories` — id, owner, name, default branch, created time, updated time
   - The id is the numeric GitHub repository id. The index id and the vector id hold it, and Vectorize limits both to 64 bytes. A UUID makes the vector id 78 bytes or more.
-- `indexes` — id, repository id, commit sha, status, stage, error, file count, chunk count, embedding model id, created time, ready time, last question time
-- `chunks` — id, index id, path, language, symbol, kind, start line, end line, content, identifiers
+- `indexes` — id, repository id, commit sha, status, failed stage, failure reason, file count, chunk count, embedding model id, created time, updated time, ready time, last question time
+  - The status is one of `queued`, `parsing`, `embedding`, `ready`, `failed`, and `deleting`.
+- `chunks` — id, index id, sequence number, path, language, symbol, kind, start line, end line, content, identifiers
 - `chunks_fts` — an FTS5 table over `chunks`. Phase 3.
-- `questions` — id, index id, repository full name, commit sha, preset, question, answer, citations, model ids, input tokens, output tokens, latency of each stage, created time
+- `questions` — id, index id, repository full name, commit sha, preset, question, answer, citations, embedding model id, answer model id, input tokens, output tokens, retrieval time, first token time, answer time, created time
   - The id is a random 128-bit value, so nobody can guess a share link.
-  - `citations` is JSON. It copies each cited chunk: the path, the line range, the symbol, the code, and the confidence label. The share page reads only this row, so it works after the cleanup deletes the index.
+  - `index_id` has no foreign key, so the row outlives its index.
+  - `citations` is JSON. It copies each cited chunk: the path, the line range, the symbol, the code, and the GitHub link. Phase 3 adds the confidence label. The share page reads only this row, so it works after the cleanup deletes the index.
 
 The FTS5 table uses `tokenize = "unicode61 tokenchars '_'"`, so `snake_case` names stay whole. It indexes three columns: `index_id`, `content`, and `identifiers`. Each match expression starts with the index id, so a query reads one index.
 
@@ -161,23 +185,25 @@ D1 stops at 10 GB for one database. The 30-day cleanup keeps the chunk text unde
 **Vectorize** holds one vector for each chunk.
 
 - The namespace is the index id. A query reads one namespace.
-- The vector id is `<indexId>:<chunkSeq>`. Vectorize limits an id to 64 bytes.
+- The vector id is the chunk id, `<indexId>:<chunkSeq>`. Vectorize limits an id to 64 bytes.
 - The metadata holds `path`, `language`, and `kind`. Create the metadata indexes before the first insert.
 - Vectorize indexes only the first 64 bytes of a metadata value. A path filter longer than that becomes a filter after the query.
 - The dimension of an index is fixed. A new embedding model needs a new Vectorize index and a full re-index.
+- An upsert is asynchronous. A vector is searchable only after Vectorize processes the mutation.
 
-**R2** holds the chunk batches of an index job, and the eval reports from Phase 4. The Workflow deletes the batches after the `ready` step.
+**R2** holds the chunk batches of an index job, and the eval reports from Phase 4. The Workflow deletes the batches after the `ready` step or after a failure.
 
 ### Tier 6: Models
 
-AI Gateway fronts each model call. It records the model id, the tokens, and the latency for the `questions` row. Each model id is a Worker var.
+AI Gateway fronts each model call. It records the model id, the tokens, and the latency for the `questions` row.
 
 - **Embeddings.** Phase 1 starts with the Workers AI model `@cf/google/embeddinggemma-2`. It covers code, gives 768 dimensions, and has an 8,192-token context window.
+  - The model id is the constant `EMBEDDING_MODEL_ID` in `packages/domain`, not a Worker var. The gateway and the pipeline must use the same model, and the Vectorize dimension depends on it.
   - The model expects task prefixes. A question becomes `task: search result | query: <question>`. A chunk uses the `title` and `text` form in the chunk rules.
-  - The model page states no batch size limit for each call. Measure it on staging before you fix the embed step at 500 chunks.
+  - The model page states no batch size limit for each call. `EMBED_BATCH_SIZE` starts at 100. Measure it on staging.
   - Phase 3 compares it with `voyage-code-3` and `text-embedding-3-small` through AI Gateway. Each candidate fits the Vectorize limit of 1536 dimensions.
 - **Reranker.** Phase 3 starts with Workers AI `bge-reranker-base`. The ablation compares it with Cohere Rerank through AI Gateway.
-- **Answer model.** OpenRouter model `anthropic/claude-haiku-5.5`, through the AI Gateway OpenRouter route. Stream the tokens. Temperature 0. The Worker var is `ANSWER_MODEL_ID`.
+- **Answer model.** OpenRouter model `anthropic/claude-haiku-5.5`, through the AI Gateway OpenRouter route. Stream the tokens. Temperature 0. The Worker var is `ANSWER_MODEL_ID`. The gateway calls it with `fetch`, with no SDK.
   - Set `reasoning.effort` to `none`. Thinking is on by default. Thinking tokens delay the first answer token and add to the output bill.
   - OpenRouter lists this model at $0.10 per million input tokens and $0.50 per million output tokens, as of November 2026.
   - Prefer the Anthropic route. Its p50 latency is 0.88 seconds. The Bedrock route is 2.44 seconds, and that route can miss the 3-second first-token target.
@@ -185,7 +211,7 @@ AI Gateway fronts each model call. It records the model id, the tokens, and the 
 
 ### Tier 7: Evals (`apps/evals`)
 
-Python 3.12, managed with uv. CI runs it against the staging gateway.
+Python 3.12, managed with uv. CI runs it against the staging gateway. Phase 2 decides whether `apps/indexer` and `apps/evals` share a uv workspace.
 
 - `golden/<repo>.yaml` holds the repository, the commit, and each question with its kind and its ground-truth ranges.
   - The question kinds are `identifier`, `concept`, `architecture`, `start_here`, `feature`, and `out_of_repo`.
@@ -200,11 +226,11 @@ Python 3.12, managed with uv. CI runs it against the staging gateway.
 
 ### Scenario A: The user indexes a repository
 
-1. The browser posts the link and the Turnstile token to `POST /v1/indexes`.
+1. The browser posts the link and the Turnstile token to `POST /v1/indexes` on the gateway origin.
 2. The gateway checks the limits, reads the head commit, and inserts the `indexes` row.
-3. The gateway creates the Workflow instance and returns `201` with the index id.
-4. The browser polls `GET /v1/indexes/:id` every 2 seconds.
-5. The Workflow runs the container, stores the chunks, embeds them, and sets `ready`.
+3. The gateway creates the Workflow instance and returns `201` with the index view.
+4. The browser moves to `/r/:owner/:repo?index=<indexId>` and polls `GET /v1/indexes/:id` every 2 seconds.
+5. The Workflow runs the container, stores the chunks, embeds them, waits for Vectorize, and sets `ready`.
 6. The browser opens the ask screen.
 
 ### Scenario B: The user asks a question
@@ -220,7 +246,7 @@ Python 3.12, managed with uv. CI runs it against the staging gateway.
 4. Load the chunk rows from D1 and send the `retrieval` event.
 5. Build the prompt from the answer contract in the PRD.
    - For "Where do I start?", also load the distinct paths of the index from `chunks`, up to `START_HERE_MAX_PATHS`.
-6. Stream the model tokens as `token` events.
+6. Stream the model tokens as `token` events. A model failure sends one `error` event and ends the stream.
 7. Send `done` with the question id. Write the `questions` row with `ctx.waitUntil`.
 
 Vectorize returns 50 results at most when a query asks for metadata. That limit sets the top 50 of the hybrid path.
@@ -243,12 +269,12 @@ Vectorize returns 50 results at most when a query asks for metadata. That limit 
 ### Scenario C: The default branch moves
 
 1. A new request finds a new head commit. Scenario A runs for that commit.
-2. Questions use the old index until the new index is `ready`.
-3. The last Workflow step deletes the old index:
-   - Delete the vectors by id, in batches. The `chunks` rows supply the ids, so they go last.
-   - Delete the `chunks` rows and the `indexes` row.
+2. Questions use the old index until the new index is `ready`. The status response names the old index in `fallbackIndexId`.
+3. The last step of `RepositoryIndexing` starts one `IndexDeletion` for each earlier index of the repository:
+   - Delete the vectors by id, in pages. The `chunks` rows supply the ids, so they go after the vectors.
+   - Delete the `indexes` row last.
 
-The cleanup cron uses the same delete steps.
+The cleanup cron starts the same Workflow.
 
 ### Scenario D: The user traces a symbol (Phase 3)
 
@@ -266,16 +292,18 @@ The trace calls no model, so it costs no tokens.
 1. The browser loads `/a/:id`, then calls `GET /v1/questions/:id`.
 2. The gateway reads the `questions` row and returns the question, the answer, and the citations.
 3. An unknown id returns `404`.
+
 ---
 
 ## 5. Security
 
-- **Repository text is data.** The prompt marks each chunk as data. The answer contract tells the model to ignore an instruction inside a chunk. A golden case tests it.
+- **Repository text is data.** The prompt wraps each chunk in tags after the rules. The answer contract tells the model to ignore an instruction inside a chunk. A unit test checks it in Phase 1. A golden case tests it from Phase 2.
 - **No code runs.** The indexer parses files. It does not run a build, a script, or a package install.
-- **Tarball safety.** The extract step rejects a path that leaves the target folder, and a symbolic link.
+- **Tarball safety.** The extract step rejects a path that leaves the target folder, and skips each symbolic link.
 - **Abuse.** Turnstile and the `RateLimiter` Durable Object guard the gateway. The size limits guard the container.
-- **Index scope.** The index id comes from the route. Each Vectorize query sets the namespace. Each FTS5 query starts with the index id.
-- **Secrets.** `GITHUB_TOKEN`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `TURNSTILE_SECRET`, and `OPENROUTER_API_KEY` are Worker secrets. The pipeline passes the R2 keys and the GitHub token to the container as environment variables. The container does not receive the OpenRouter key.
+- **CORS.** The gateway allows only the web origin. CORS does not stop a script outside a browser, so Turnstile and the rate limits stay the real guard.
+- **Index scope.** The index id comes from the route. Each Vectorize query sets the namespace. Each D1 chunk query filters on the index id. Each FTS5 query starts with the index id.
+- **Secrets.** `TURNSTILE_SECRET`, `GITHUB_TOKEN`, and `OPENROUTER_API_KEY` are gateway secrets. `GITHUB_TOKEN`, `R2_ACCESS_KEY_ID`, and `R2_SECRET_ACCESS_KEY` are pipeline secrets. The pipeline passes its three secrets to the container as environment variables. The web Worker has no secret.
 
 ---
 
@@ -287,13 +315,15 @@ One environment: staging. Each resource name is `repotron-staging-<role>`, such 
 - `.github/workflows/deploy-staging.yml` runs on each push to `develop`:
   1. Lint, type check, and test the TypeScript and the Python code.
   2. Apply the D1 migrations.
-  3. Deploy the gateway and the pipeline. The pipeline deploy builds the indexer image, so the runner needs Docker.
-  4. Phase 2: run `apps/evals` against staging. Fail on a regression.
-- One-time setup: the Cloudflare API token, the Vectorize index with its metadata indexes, the R2 API keys, the Turnstile site, the GitHub token, and the OpenRouter token.
+  3. Create each missing CI resource: the R2 bucket, the Vectorize index with its metadata indexes, and the AI Gateway.
+  4. Deploy the pipeline, then the gateway. The gateway binds a Workflow of the pipeline. The pipeline deploy builds the indexer image, so the runner needs Docker.
+  5. Deploy the web Worker. It has no binding, so it needs no other deploy first.
+  6. Phase 2: run `apps/evals` against staging. Fail on a regression.
+- Manual setup: the Cloudflare API token, the D1 database, the Turnstile widget, the GitHub token, the OpenRouter key, the R2 API keys, and the Worker secrets. Each one gives a value that goes into the code or into a secret. [phase-1-plan.md](phase-1-plan.md), section 7, gives the delivery stages and each manual step.
 
 ### Why these Cloudflare products
 
-- **Workers** serve the API and the web app with no server to run.
+- **Workers** serve the API, and serve the web app as static assets, with no server to run.
 - **Workflows** retry one step of a long index job. A finished step stays finished.
 - **Containers** run Python and Tree-sitter with a disk and enough memory for a large repository.
 - **D1** holds the rows and the FTS5 BM25 index.
@@ -307,31 +337,35 @@ One environment: staging. Each resource name is `repotron-staging-<role>`, such 
 
 ## 7. Repository layout
 
+[phase-1-plan.md](phase-1-plan.md), section 4, holds the full Phase 1 tree.
+
 ```text
 repotron/
+├── .cursor/rules/               # repotron.mdc and repotron-rule-maintenance.mdc
+├── .github/workflows/deploy-staging.yml
+├── .husky/pre-commit
 ├── package.json                 # pnpm workspace root
 ├── pnpm-workspace.yaml          # apps/* and packages/*
 ├── turbo.json
-├── pyproject.toml               # uv workspace: apps/indexer, apps/evals
-├── .github/workflows/deploy-staging.yml
+├── drizzle.config.ts
+├── scripts/                     # migration journal sync, R2 bucket check
 ├── docs/
-│   ├── prd.md
-│   ├── architecture.md
-│   └── features.md
 ├── apps/
-│   ├── web/                     # React + Vite
-│   ├── gateway/                 # Public Worker. Hono.
-│   ├── pipeline/                # Private Worker. Workflow, Container class, cron.
-│   ├── indexer/                 # Python. Dockerfile, FastAPI, Tree-sitter.
-│   └── evals/                   # Python. Golden set, metrics, baseline.json.
+│   ├── web/                     # React + Vite. Assets-only Worker.
+│   ├── gateway/                 # Public API Worker. Hono. RateLimiter.
+│   ├── pipeline/                # Private Worker. Workflows, Container class, cron.
+│   ├── indexer/                 # Python. uv project, Dockerfile, FastAPI, Tree-sitter.
+│   └── evals/                   # Python. Golden set, metrics, baseline.json. Phase 2.
 ├── packages/
-│   ├── db/                      # Drizzle schema for D1
-│   ├── domain/                  # Zod schemas, chunk shape, retrieval constants
+│   ├── db/                      # Drizzle schema and repositories for D1
+│   ├── domain/                  # repotron-domain: Zod schemas, chunk shape, constants
 │   └── log/
 └── infra/
     └── migrations/              # D1 SQL
 ```
 
-`packages/domain` holds `MAX_CHUNK_TOKENS`, `RRF_K` (60), `RETRIEVAL_TOP_K` (50), `CONTEXT_CHUNKS` (8), `CONFIDENCE_HIGH` (0.7), `CONFIDENCE_MEDIUM` (0.3), and `START_HERE_MAX_PATHS` (500). `MAX_CHUNK_TOKENS` has no value yet. The value must keep the header and the content under the 8,192-token window of the embedding model. `tiktoken` counts tokens differently from the Gemma tokenizer, so leave a margin.
+`packages/domain` holds the Phase 1 constants. Examples: `MAX_CHUNK_TOKENS` (1,500, a starting value), `CONTEXT_CHUNKS` (8), `EMBED_BATCH_SIZE` (100), `START_HERE_MAX_PATHS` (500), and `EMBEDDING_MODEL_ID`. Phase 3 adds `RRF_K` (60), `RETRIEVAL_TOP_K` (50), `CONFIDENCE_HIGH` (0.7), and `CONFIDENCE_MEDIUM` (0.3).
+
+`MAX_CHUNK_TOKENS` keeps the header and the content under the 8,192-token window of the embedding model. `tiktoken` counts tokens differently from the Gemma tokenizer, so the value leaves a margin.
 
 The Python indexer reads the chunk shape from a JSON Schema that `packages/domain` exports, so both languages use one contract.

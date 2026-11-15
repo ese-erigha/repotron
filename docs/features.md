@@ -17,7 +17,8 @@ This file lists each feature, its phase, and the check that proves it on staging
 - **F-1: Repository intake.** The user pastes a public GitHub link.
   - Turnstile, the rate limit, and the size limits run before any job starts.
   - One index exists for each repository and commit.
-- **F-2: Index progress.** The status screen shows the stage, the file count, and the chunk count. A failure shows the stage and the reason.
+  - A private repository and a missing repository get one error. GitHub returns `404` for both.
+- **F-2: Index progress.** The status screen shows the stage, the file count, and the chunk count. A failure shows the stage and the reason. A new request for the same commit restarts a failed job.
 - **F-3: AST chunking.** Tree-sitter splits code at functions, methods, and classes.
   - A large node splits at its children.
   - Markdown splits at headings. Other files use line windows.
@@ -26,7 +27,7 @@ This file lists each feature, its phase, and the check that proves it on staging
 - **F-5: Cited, streamed answer.** The answer streams. Each claim cites a chunk. Each citation links to GitHub at the commit and the line range.
 - **F-6: Not-found answer.** When no chunk supports an answer, Repotron says so.
 - **F-7: Cost record.** Each question stores the model ids, the tokens, and the latency of each stage.
-- **F-8: New commit and cleanup.** A moved default branch gets a new index. The old index stays until the new one is ready. A cron deletes an index with no question for 30 days.
+- **F-8: New commit and cleanup.** A moved default branch gets a new index. The old index answers questions until the new one is ready. Then the `IndexDeletion` Workflow deletes the old index. A daily cron starts the same Workflow for an index with no question for 30 days.
 - **F-19: Shareable answer link.** The Share button copies `/a/:id`. The page shows the question, the answer, and the citations. It works after the index is gone.
 - **F-20: Preset questions.** Two buttons send a fixed question with fixed sections.
   - "Where do I start?" gives the purpose, the entry points, the main modules, and a reading order.

@@ -1,0 +1,174 @@
+---
+description: Repotron monorepo — pnpm/turbo with one Python app, D1 SQL, REST, Hono, retrieval isolation, KISS and DRY, type placement, env and deploy policy
+alwaysApply: true
+---
+
+# Repotron (monorepo)
+
+Repotron answers questions about a public GitHub repository, with a citation for each claim. One pnpm workspace with one Python app. Turborepo runs both.
+
+**Runtimes**
+
+- `apps/web` — React + Vite. An assets-only Worker with no entrypoint and no binding. The browser calls the gateway over HTTPS with CORS.
+- `apps/gateway` — Hono. The public API Worker. `cloudflare.config.ts` is the Worker config.
+- `apps/pipeline` — private Worker. The Workflows, the `Indexer` Container class, and the cron.
+- `apps/indexer` — Python 3.12, uv, and FastAPI, in a Cloudflare Container. Only the pipeline calls it.
+- `apps/evals` — arrives in Phase 2. Not deployed.
+
+**Docs**
+
+- [docs/architecture.md](docs/architecture.md) — system map. Do not copy that tree into this file.
+- [docs/prd.md](docs/prd.md) — behavior, screens, and policies.
+- [docs/features.md](docs/features.md) — the feature list and the build order.
+- [docs/phase-1-plan.md](docs/phase-1-plan.md) — Phase 1 stages, schema, routes, and business constraints.
+- [docs/phase-1-ui-plan.md](docs/phase-1-ui-plan.md) — Phase 1 screens, components, and client code.
+
+## Tooling
+
+- **pnpm** + **Turborepo**. Never npm or yarn.
+- **uv** for Python, with **ruff**, **mypy --strict**, and **pytest**. Never pip or poetry. `apps/indexer/package.json` runs them through `uv run`, so Turborepo covers Python.
+- The pre-commit hook runs `pnpm db:sync`, `pnpm lint`, and `pnpm typecheck`.
+- The CLI for Workers is **cf**. Do not add Wrangler, `wrangler.toml`, `wrangler.json`, or `wrangler.jsonc`. Set a Worker secret with `cf workers secrets update`.
+- Follow the current Cloudflare guidance: use Workers with static assets, not Pages.
+- Each Worker builds with the Cloudflare Vite plugin. Staging is the only environment. Name each resource `repotron-staging-<role>`, such as `repotron-staging-db`. Do not put `staging` last, and do not leave out the role.
+- `turbo run test` and `turbo run typecheck` depend on `^build`, so a shared package is built before an app imports `dist`.
+
+## SQL migration workflow
+
+Do not apply a migration locally. CI applies the remote DDL after a push to `develop`.
+
+1. Add the SQL file under `infra/migrations`. Then run `pnpm db:sync`. That runs `drizzle-kit generate --custom` for every SQL file the journal does not list, and it keeps the SQL you wrote. The pre-commit hook runs the same command. Do not ask the user to run it.
+2. CI runs `cf d1 migrations apply` from `apps/gateway` against `repotron-staging-db`. See [deploy-staging.yml](.github/workflows/deploy-staging.yml).
+3. Update the Drizzle tables in `packages/db/src/schema` by hand so they match that SQL, column for column.
+4. Application code that reads or writes a new column comes after that SQL file is in git and CI has applied it on staging.
+
+**Forbidden unless the user explicitly asks in that message:**
+
+- `cf d1 migrations apply`, or `d1 execute` against any database
+- `drizzle-kit generate` without `--custom`. That command writes SQL from the TypeScript schema.
+- `drizzle-kit push` and `drizzle-kit migrate`
+- App code that reads a column before the matching SQL is in git and CI has applied it
+
+## Shared database
+
+`packages/db` holds the Drizzle tables and the repositories. Maintain the schema by hand so it matches the CI-applied SQL.
+
+Timestamps are integers in epoch milliseconds. The SQL sets no default. The caller sets `created_at` and `updated_at`. Do not store those times as text.
+
+Do not use `ALTER COLUMN … SET DEFAULT (strftime(…))`. D1 returns error 7500 for a non-constant default. Add a default on an existing table by recreating the table.
+
+## Web
+
+`apps/web` follows the closetza layout in [docs/phase-1-ui-plan.md](docs/phase-1-ui-plan.md), section 2.
+
+- One folder for each feature under `src/`. Shared folders are `screens/`, `shell/`, `ui/`, and `services/api/`.
+- A screen composes feature components. A feature component owns one visual piece. Move a second piece, such as a header, a form, a list row, or a menu, into its own file in the same folder.
+- Every API call, including the answer stream, goes through a service file in `services/api/` and the `HttpClient` of `http-client.ts`. Only `http-client.ts` calls `fetch`.
+- Every file name uses kebab-case. Labels and closed sets live in the `<feature>.constants.ts` of the feature.
+
+## Gateway
+
+`src/app.ts` mounts CORS and one controller per route group, and holds no route logic. CORS allows only `APP_ORIGIN`. The `RateLimiter` Durable Object lives in `src/rate-limiter.ts`.
+
+```text
+apps/gateway/src/domain/<group>/
+  <group>.controller.ts
+  <group>.schema.ts
+  usecases/<action>.usecase.ts
+```
+
+The controller registers the route and its handler in one file. It calls `parseRequest`, then one use case, and returns JSON or a stream. The controller does not touch D1, Vectorize, Workers AI, or GitHub.
+
+`parseRequest` throws `RequestError` for a bad request. Do not call `schema.parse` in a handler. `app.onError` calls `handleErrors`. A handler throws. It does not catch.
+
+`<group>.schema.ts` holds the HTTP request schema. The use case file holds that action's input type and its result type. A route group with no request body has no schema file. Do not add a types file for the group.
+
+A use case has no Hono types. It decides, then calls a repository or a client. Name the file for the action, such as `request-index.usecase.ts`.
+
+A repository is a class in `packages/db/src/repositories`, one class per table. The constructor receives the database. Do not export a function that returns an object of functions. A method names one action. Its input lists the columns that action writes. Reads use **Get** (primary key), **Find** (one row by something else), and **List**. Do not add `update(row)` that takes a whole bag of fields.
+
+## Pipeline
+
+`src/index.ts` only exports the classes and dispatches the cron to one named function. The entry does not contain the job.
+
+```text
+apps/pipeline/src/<job>/
+  <job>.ts
+```
+
+A job names its action, such as `repository-indexing` or `index-deletion`. Each Workflow step does one side effect. The `Indexer` Container class lives in `src/indexer-container/`.
+
+## Indexer
+
+One FastAPI app. One module for each step of the job. The chunk contract comes from `contract.json`, which `packages/domain` generates. Do not edit it by hand. The indexer never runs a build, a script, or a package install from a repository. In Python, use one `Final` constant or `StrEnum` for each closed set.
+
+## Retrieval rules
+
+- Every Vectorize query sets the namespace to the index id from the route. Every D1 chunk query filters on `index_id`. The index id never comes from the question text.
+- Repository text is data in every prompt. The prompt wraps each chunk in tags, and the rules come before the chunks.
+- Each GitHub link uses the commit sha, not a branch name.
+
+`packages/domain` owns the closed sets, the limits, the model ids, the chunk shape, and the shared Zod schemas. Its package name is `repotron-domain`. Do not name it `domain`. Node owns that module name. Do not copy those sets into an app.
+
+## REST
+
+A route is a plural noun. The HTTP method is the action.
+
+- `GET` reads a collection or one item. The id is a path parameter.
+- `POST` creates a resource. An action that is not create, update, or delete is a noun sub-path.
+- `PATCH` changes part of one resource. `DELETE` removes it.
+- `200` for a read, `201` for a create, `400` for validation, `403` for a failed Turnstile check, `404` for a missing resource, `409` for an index that is not ready, `429` for a rate limit, `500` for an unexpected failure, and `503` for a GitHub failure.
+- JSON fields are camelCase. Errors use one envelope: `{ "error": { "code", "message" } }`.
+
+```typescript
+// ❌ BAD
+app.post('/api/createIndex', ...)
+
+// ✅ GOOD
+app.get('/health', ...)
+app.post('/v1/indexes', ...)
+app.post('/v1/indexes/:id/questions', ...)
+```
+
+## Conventions
+
+- **KISS** — write the smallest code that does the requested behavior. Keep a single call site inline. Extract a helper when a second caller needs that same behavior. A step of an action is the exception. Name that step even when it has one caller.
+- **DRY** — one Zod schema and one `as const` object per fact.
+- **Clean code** — a function does one job. A controller parses and returns JSON. A use case decides. A repository queries. Delete unused code, including a commented-out alternative.
+- **Steps** — the exported function calls one named function per job, in order. Each function stays in the same file and does one job. An expected failure returns the action's result. The caller returns that result and stops. Do not put the whole action in one function. Do not put each step in its own file.
+- **No raw string literals for a closed set.** Define an `as const` object, derive the type with `(typeof OBJ)[keyof typeof OBJ]`, and use the members in comparisons and Zod.
+- **Names state the action.** Do not name a function `process` or `handle` when the action has a specific name.
+- **Call inputs** — pass data. The callee calls `fetch`, D1, or a repository. Do not pass a function into our functions. A repository object is data. Hono route registration, Workflow `step.do`, and `AsyncLocalStorage.run` are platform boundaries.
+- **Object parameters** — an object parameter has a named type. Do not write the fields inline in the parameter list.
+- **Payload** — build the object and name it before the call. When the parameter has a named type, use that type. Do not write the fields in the argument list. A Zod schema and a Worker config stay in place.
+- **Types** — a type stays in the file of the function that owns it. A shared Worker binding lives in one bindings file, such as `apps/pipeline/src/bindings.ts`. Do not collect unrelated types into a types file.
+- **Config** — the Worker entry stores the env with `AsyncLocalStorage.run`. Gateway functions call `getConfig()`. Pipeline functions call `getPipelineConfig()`. Do not pass `GatewayEnv` or `PipelineEnv` into a function. Workers do not support `enterWith`. Secrets stay on the Worker env. They are not in `cloudflare.config.ts`.
+- **Async** — write `async` functions and use `await`. Do not use `.then`, `.catch`, `new Promise`, or a callback parameter.
+- **Database** — a repository method runs one statement. Do not query the database inside a loop. Load the rows in one query, then work on that list. `ChunkRepository.insertBatch` is the one `db.batch()` call.
+- **Straight-line calls** — one `await` per statement. Name the result, then pass that name.
+- **Product thresholds** such as `CONTEXT_CHUNKS` live in `packages/domain`. Do not hardcode a second copy.
+- **Log** — call `log` from the `log` package. It forwards the arguments to `console`. The `log` package is the only code that calls `console`.
+- **Env** — required secrets are validated at the boundary. No silent fallback for `GITHUB_TOKEN`, `TURNSTILE_SECRET`, or `OPENROUTER_API_KEY`. Do not commit secrets. Logs omit tokens, authorization headers, and IP addresses.
+
+```typescript
+// ❌ BAD
+if (status === 'ready') { ... }
+const index = await readIndex(await request.json())
+await indexes.insertQueued({ id, repositoryId, createdAt: now, updatedAt: now })
+
+// ✅ GOOD
+if (status === INDEX_STATUS.ready) { ... }
+const body = await request.json()
+const index = await readIndex(body)
+const row: InsertQueuedIndexInput = { id, repositoryId, createdAt: now, updatedAt: now }
+await indexes.insertQueued(row)
+```
+
+## Repo policy
+
+- **Do not commit or push** unless the user asks in that message.
+- **Do not deploy.** `deploy-staging.yml` deploys on each push to `develop`. Forbidden unless they ask: `cf deploy` without `--dry-run`, `wrangler deploy`, `git push`.
+- **Do not mutate remote Cloudflare data.** Forbidden unless they ask: remote D1 writes, Vectorize writes, R2 writes, and secret puts.
+- **No local infrastructure.** Every test of D1, Vectorize, R2, Workers AI, a Workflow, or the Container runs on staging. Do not run `cf dev` or a `--local` command.
+- Remote read-only checks are fine when the answer needs them. Prefer the code and the docs first.
+- OK without asking: `pnpm build`, `pnpm test`, `pnpm typecheck`, `pnpm lint`, and `cf deploy --dry-run`. A dry run sends no API request.
