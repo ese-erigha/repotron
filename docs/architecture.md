@@ -61,16 +61,18 @@ Shared stores
 
 ### Tier 1: Web app (`apps/web`)
 
-React and Vite. The Worker `repotron-staging-web` serves the Vite client build as static assets. This is the current Cloudflare guidance: use Workers with static assets, not Pages. The Worker has no `entrypoint`, so no request runs code.
+React and Vite. The Worker `repotron-staging-web` serves the Vite client build as static assets, and it answers `/api/v1` from the files in `apps/web/fixtures`. The browser calls that same origin. The Worker has no binding and no secret.
 
 - `notFoundHandling` is `single-page-application`, so a reload of a screen route returns the app.
-- `apps/web/src/config/public-config.ts` holds `API_ORIGIN`, the gateway URL, and the Turnstile site key. Both values are public.
+- `apps/web/src/config/public-config.ts` holds `API_ORIGIN` and the Turnstile site key. `API_ORIGIN` is empty, so the browser calls this Worker. Both values are public.
 - `/` holds the link box, Turnstile, and the recent list.
 - `/r/:owner/:repo?index=<indexId>` shows the status, then the ask screen. A reload reads the status by id, so it needs no new Turnstile token.
 - `/a/:id` shows one shared answer.
 - `/dashboard` shows the eval chart. Phase 4.
 
 The ask screen reads the answer stream with `fetch` and a stream reader. The citation panel renders the `retrieval` event before the first token.
+
+**Local run.** `pnpm --filter web dev` serves the app at `http://localhost:5173`. The Vite dev server answers `/api/v1` from `apps/web/fixtures`, so the app needs no gateway and no Cloudflare resource. The deployed Worker serves those same files. [phase-1-ui-plan.md](phase-1-ui-plan.md), section 12, lists the fixture repositories and the links that show each state.
 
 ### Tier 2: Public API Worker (`apps/gateway`)
 
@@ -312,13 +314,13 @@ The trace calls no model, so it costs no tokens.
 One environment: staging. Each resource name is `repotron-staging-<role>`, such as `repotron-staging-db`.
 
 - The CLI is `cf`. Each Worker config is `cloudflare.config.ts`. Do not add a Wrangler config.
-- `.github/workflows/deploy-staging.yml` runs on each push to `develop`:
+- `.github/workflows/deploy-staging.yml` runs on a push to `develop` when the gateway, the pipeline, the indexer, a shared package, or the infra changes:
   1. Lint, type check, and test the TypeScript and the Python code.
   2. Apply the D1 migrations.
   3. Create each missing CI resource: the R2 bucket, the Vectorize index with its metadata indexes, and the AI Gateway.
   4. Deploy the pipeline, then the gateway. The gateway binds a Workflow of the pipeline. The pipeline deploy builds the indexer image, so the runner needs Docker.
-  5. Deploy the web Worker. It has no binding, so it needs no other deploy first.
-  6. Phase 2: run `apps/evals` against staging. Fail on a regression.
+- `.github/workflows/deploy-web.yml` runs on a push to `develop` when `apps/web`, `packages/domain`, or the lockfile changes. It checks the web package and deploys `repotron-staging-web`. A web-only change does not run the staging workflow.
+- Phase 2: run `apps/evals` against staging. Fail on a regression.
 - Manual setup: the Cloudflare API token, the D1 database, the Turnstile widget, the GitHub token, the OpenRouter key, the R2 API keys, and the Worker secrets. Each one gives a value that goes into the code or into a secret. [phase-1-plan.md](phase-1-plan.md), section 7, gives the delivery stages and each manual step.
 
 ### Why these Cloudflare products
@@ -343,6 +345,7 @@ One environment: staging. Each resource name is `repotron-staging-<role>`, such 
 repotron/
 ├── .cursor/rules/               # repotron.mdc and repotron-rule-maintenance.mdc
 ├── .github/workflows/deploy-staging.yml
+├── .github/workflows/deploy-web.yml
 ├── .husky/pre-commit
 ├── package.json                 # pnpm workspace root
 ├── pnpm-workspace.yaml          # apps/* and packages/*
@@ -351,7 +354,7 @@ repotron/
 ├── scripts/                     # migration journal sync, R2 bucket check
 ├── docs/
 ├── apps/
-│   ├── web/                     # React + Vite. Assets-only Worker.
+│   ├── web/                     # React + Vite. Assets-only Worker. fixtures/ serves the API on the dev server.
 │   ├── gateway/                 # Public API Worker. Hono. RateLimiter.
 │   ├── pipeline/                # Private Worker. Workflows, Container class, cron.
 │   ├── indexer/                 # Python. uv project, Dockerfile, FastAPI, Tree-sitter.

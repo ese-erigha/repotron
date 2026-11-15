@@ -9,7 +9,7 @@ Repotron answers questions about a public GitHub repository, with a citation for
 
 **Runtimes**
 
-- `apps/web` — React + Vite. An assets-only Worker with no entrypoint and no binding. The browser calls the gateway over HTTPS with CORS.
+- `apps/web` — React + Vite. `repotron-staging-web` serves the screens and answers `/api/v1` from `fixtures/`. It has no secret and no binding.
 - `apps/gateway` — Hono. The public API Worker. `cloudflare.config.ts` is the Worker config.
 - `apps/pipeline` — private Worker. The Workflows, the `Indexer` Container class, and the cron.
 - `apps/indexer` — Python 3.12, uv, and FastAPI, in a Cloudflare Container. Only the pipeline calls it.
@@ -65,6 +65,7 @@ Do not use `ALTER COLUMN … SET DEFAULT (strftime(…))`. D1 returns error 7500
 - A screen composes feature components. A feature component owns one visual piece. Move a second piece, such as a header, a form, a list row, or a menu, into its own file in the same folder.
 - Every API call, including the answer stream, goes through a service file in `services/api/` and the `HttpClient` of `http-client.ts`. Only `http-client.ts` calls `fetch`.
 - Every file name uses kebab-case. Labels and closed sets live in the `<feature>.constants.ts` of the feature.
+- `pnpm --filter web dev` serves the app on localhost. The Vite dev server answers `/api/v1` from `apps/web/fixtures`, with no gateway and no Cloudflare resource. When a gateway route, status code, or message changes, change the fixture in the same change. `fixtures/` is Node code, so its imports hold the `.ts` extension.
 
 ## Gateway
 
@@ -167,7 +168,7 @@ await indexes.insertQueued(row)
 ## Repo policy
 
 - **Do not commit or push** unless the user asks in that message.
-- **Do not deploy.** `deploy-staging.yml` deploys on each push to `develop`. Forbidden unless they ask: `cf deploy` without `--dry-run`, `wrangler deploy`, `git push`.
+- **Do not deploy.** A push to `develop` deploys. `deploy-staging.yml` covers the gateway and the pipeline. `deploy-web.yml` covers the web Worker, and it runs only when web paths change. Forbidden unless they ask: `cf deploy` without `--dry-run`, `wrangler deploy`, `git push`.
 - **Do not mutate remote Cloudflare data.** Forbidden unless they ask: remote D1 writes, Vectorize writes, R2 writes, and secret puts.
 - **No local infrastructure.** Every test of D1, Vectorize, R2, Workers AI, a Workflow, or the Container runs on staging. Do not run `cf dev` or a `--local` command.
 - Remote read-only checks are fine when the answer needs them. Prefer the code and the docs first.

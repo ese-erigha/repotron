@@ -13,7 +13,7 @@ This plan turns Phase 1 of [prd.md](prd.md) into work that one implementer can d
 **Ground rules for the implementer:**
 
 - Every test of D1, Vectorize, R2, Workers AI, a Workflow, or the Container runs on staging. Do not run `cf dev` or a `--local` command.
-- Do not deploy, merge, or apply a migration. A push to `develop` runs `deploy-staging.yml`, which does both.
+- Do not deploy, merge, or apply a migration. A push to `develop` runs `deploy-staging.yml` for the gateway and the pipeline, and `deploy-web.yml` for the web app.
 - TypeScript unit tests run with `node:test`. Python unit tests run with `pytest`. A unit test calls no Cloudflare API, no GitHub API, and no OpenRouter API. It uses fakes or fixture files.
 - Section 7 gives the delivery stages in order. Each code stage is one pull request to `develop`.
 
@@ -198,6 +198,7 @@ repotron/
 │   ├── repotron.mdc                    # standing rules (section 5)
 │   └── repotron-rule-maintenance.mdc   # when to update the rule
 ├── .github/workflows/deploy-staging.yml
+├── .github/workflows/deploy-web.yml
 ├── .husky/pre-commit
 ├── .gitignore
 ├── package.json                        # pnpm root: turbo scripts, db:sync, husky
@@ -473,7 +474,7 @@ Each create command passed a `--dry-run`. Each `get` returns `404 Not Found` for
 - **Build**
   - `apps/gateway` with its config (section 8): the env schema, the error envelope, CORS, `GET /health`, the `404` fallback, and the `RateLimiter` Durable Object
   - `apps/web` with its config (section 8), `public-config.ts` with the gateway URL and the site key, and a home screen that calls `GET /health` through the `HttpClient` in `services/api/`. [phase-1-ui-plan.md](phase-1-ui-plan.md), section 10, lists the UI work of each stage.
-  - The `deploy-gateway` job, after `deploy-pipeline`, and the `deploy-web` job
+  - The `deploy-gateway` job, after `deploy-pipeline`, and `.github/workflows/deploy-web.yml`
 - **Local check:** unit tests prove 4 rules:
   - An unknown `/api/v1/*` path returns the `404` envelope.
   - A request from `APP_ORIGIN` gets the CORS headers, and a request from another origin gets none.
@@ -583,11 +584,11 @@ Run these steps on staging:
 
 ### `repotron-staging-web`
 
-- **Entrypoint:** none. The config omits `entrypoint`, so the Worker is assets-only. The assets are the Vite client build.
+- **Entrypoint:** `fixtures/fixture-worker.ts`. It answers `/api/v1` from the fixture files. Every other path stays with the asset Worker.
 - **Bindings:** none
-- **Assets:** `notFoundHandling: "single-page-application"`
-- **Vars and secrets:** none. `API_ORIGIN` and the Turnstile site key are public, so they live in `apps/web/src/config/public-config.ts`.
-- **Settings:** `workers.dev` on.
+- **Assets:** `notFoundHandling: "single-page-application"`, and `runWorkerFirst` is `/api/v1/*`
+- **Vars and secrets:** none. `API_ORIGIN` is empty. The Turnstile site key is the Cloudflare test key. Both live in `apps/web/src/config/public-config.ts`.
+- **Settings:** `workers.dev` on. `nodejs_compat` is on, because the fixture routes use `node:timers/promises`.
 
 ```ts
 import { defineConfig } from 'cf/config'
@@ -595,9 +596,14 @@ import { defineConfig } from 'cf/config'
 export default defineConfig({
   worker: {
     name: 'repotron-staging-web',
+    entrypoint: './fixtures/fixture-worker.ts',
     compatibilityDate: '2026-11-11',
-    assets: { notFoundHandling: 'single-page-application' },
+    compatibilityFlags: ['nodejs_compat'],
     workersDev: true,
+    assets: {
+      notFoundHandling: 'single-page-application',
+      runWorkerFirst: ['/api/v1/*'],
+    },
   },
 })
 ```
@@ -947,16 +953,18 @@ Python 3.12 and uv. Dependencies: `fastapi`, `uvicorn`, `tree-sitter`, `tree-sit
 
 ---
 
-## 15. CI: `deploy-staging.yml`
+## 15. CI
 
-Copy the Mailer file. Keep one workflow file. Change these parts.
+Two workflow files. Each one lists its paths, the same way Closetza keeps the web app out of the backend workflow. A push that touches only one list starts only that workflow.
+
+### `deploy-staging.yml`
 
 The file grows with the stages of section 7. Each job arrives with the first stage that needs it:
 
 - Stage 4: `detect-changes`, `test`, `ensure-resources`, and `summary`
 - Stage 6: `migrate`
 - Stage 7: `deploy-pipeline`, and uv in `test`
-- Stage 8: `deploy-gateway` and `deploy-web`
+- Stage 8: `deploy-gateway`
 
 The job order below is the final shape.
 
@@ -965,23 +973,26 @@ The job order below is the final shape.
 ```
 detect-changes → test → migrate (when SQL changed)
                       → ensure-resources (every run)
-                            → deploy-pipeline → deploy-gateway ─┐
-                      → deploy-web ─────────────────────────────┴→ summary
+                            → deploy-pipeline → deploy-gateway → summary
 ```
 
-- **Trigger.** A push to `develop`, and `workflow_dispatch` with `apply_migrations`, `force_deploy_gateway`, `force_deploy_pipeline`, and `force_deploy_web`.
-- **detect-changes.** 4 outputs:
+- **Trigger.** A push to `develop` that changes `apps/gateway`, `apps/pipeline`, `apps/indexer`, `packages`, `infra`, `scripts`, or the lockfile. Also `workflow_dispatch` with `apply_migrations`, `force_deploy_gateway`, and `force_deploy_pipeline`.
+- **detect-changes.** 3 outputs:
   - `migrations` — `infra/migrations/*.sql`
   - `pipeline` — `apps/pipeline/`, `apps/indexer/`, `packages/`, `pnpm-lock.yaml`, and the workflow file
   - `gateway` — `apps/gateway/`, `packages/`, `pnpm-lock.yaml`, and the workflow file
-  - `web` — `apps/web/`, `packages/`, `pnpm-lock.yaml`, and the workflow file
 - **test.** Install pnpm, Node 22, and uv with `astral-sh/setup-uv`. Run `pnpm install --frozen-lockfile`, then `pnpm turbo run lint typecheck test build`. Turbo runs the Python scripts through `apps/indexer/package.json`.
 - **migrate.** Look up `repotron-staging-db` by name. When it is missing, fail with "Create D1 repotron-staging-db with cf, as in docs/phase-1-plan.md, section 7." Apply with `cf d1 migrations apply` from `apps/gateway`.
 - **ensure-resources.** Run `scripts/ensure-resources-staging.sh`. It creates each missing CI resource: the R2 bucket, the Vectorize index and its 3 metadata indexes, and the AI Gateway. Stage 4 of section 7 gives the commands. A second run creates nothing.
 - **deploy-pipeline.** Run `pnpm build`, then `pnpm exec cf deploy --message "<sha>"` in `apps/pipeline`. The shared packages export `dist`, and a fresh runner has no `dist` until that build. The runner has Docker, and `cf` builds the indexer image.
 - **deploy-gateway.** Run `pnpm build`, then deploy. It runs after deploy-pipeline succeeds or is skipped. The Workflow binding needs the pipeline Worker.
-- **deploy-web.** Runs after test. It has no binding, so it does not wait for another deploy. `cf deploy` in `apps/web` builds the client and uploads the assets.
 - **summary.** Prints each result, as in Mailer.
+
+### `deploy-web.yml`
+
+- **Trigger.** A push to `develop` that changes `apps/web`, `packages/domain`, or the lockfile. Also `workflow_dispatch`.
+- **test.** `pnpm turbo run lint typecheck test build --filter=web...`. This covers the web app and `packages/domain`. It does not run the gateway, the pipeline, or the indexer.
+- **deploy.** `cf deploy` in `apps/web`. The Worker serves the screens and the fixture API.
 
 Phase 2 adds the eval job.
 

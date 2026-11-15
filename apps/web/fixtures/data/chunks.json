@@ -1,0 +1,166 @@
+{
+  "hono": {
+    "hono-class": {
+      "path": "src/hono.ts",
+      "startLine": 16,
+      "endLine": 34,
+      "symbol": "Hono",
+      "kind": "class",
+      "content": "export class Hono<\n  E extends Env = BlankEnv,\n  S extends Schema = BlankSchema,\n  BasePath extends string = '/',\n> extends HonoBase<E, S, BasePath> {\n  /**\n   * Creates an instance of the Hono class.\n   *\n   * @param options - Optional configuration options for the Hono instance.\n   */\n  constructor(options: HonoOptions<E> = {}) {\n    super(options)\n    this.router =\n      options.router ??\n      new SmartRouter({\n        routers: [new RegExpRouter(), new TrieRouter()],\n      })\n  }\n}"
+    },
+    "smart-router": {
+      "path": "src/router/smart-router/router.ts",
+      "startLine": 4,
+      "endLine": 70,
+      "symbol": "SmartRouter",
+      "kind": "class",
+      "content": "export class SmartRouter<T> implements Router<T> {\n  name: string = 'SmartRouter'\n  #routers: Router<T>[] = []\n  #routes?: [string, string, T][] = []\n\n  constructor(init: { routers: Router<T>[] }) {\n    this.#routers = init.routers\n  }\n\n  add(method: string, path: string, handler: T) {\n    if (!this.#routes) {\n      throw new Error(MESSAGE_MATCHER_IS_ALREADY_BUILT)\n    }\n\n    this.#routes.push([method, path, handler])\n  }\n\n  match(method: string, path: string): Result<T> {\n    if (!this.#routes) {\n      throw new Error('Fatal error')\n    }\n\n    const routers = this.#routers\n    const routes = this.#routes\n\n    const len = routers.length\n    let i = 0\n    let res\n    for (; i < len; i++) {\n      const router = routers[i]\n      try {\n        for (let i = 0, len = routes.length; i < len; i++) {\n          router.add(...routes[i])\n        }\n        res = router.match(method, path)\n      } catch (e) {\n        if (e instanceof UnsupportedPathError) {\n          continue\n        }\n        throw e\n      }\n\n      this.match = router.match.bind(router)\n      this.#routers = [router]\n      this.#routes = undefined\n      break\n    }\n\n    if (i === len) {\n      // not found\n      throw new Error('Fatal error')\n    }\n\n    // e.g. \"SmartRouter + RegExpRouter\"\n    this.name = `SmartRouter + ${this.activeRouter.name}`\n\n    return res as Result<T>\n  }\n\n  get activeRouter(): Router<T> {\n    if (this.#routes || this.#routers.length !== 1) {\n      throw new Error('No active router has been determined yet.')\n    }\n\n    return this.#routers[0]\n  }\n}"
+    },
+    "dispatch": {
+      "path": "src/hono-base.ts",
+      "startLine": 425,
+      "endLine": 485,
+      "symbol": "#dispatch",
+      "kind": "method",
+      "content": "  #dispatch(\n    request: Request,\n    executionCtx: ExecutionContext | FetchEventLike | undefined,\n    env: E['Bindings'],\n    method: string\n  ): Response | Promise<Response> {\n    // Handle HEAD method\n    if (method === 'HEAD') {\n      return (async () =>\n        new Response(null, await this.#dispatch(request, executionCtx, env, 'GET')))()\n    }\n\n    const path = this.getPath(request, { env })\n    const matchResult = this.router.match(method, path)\n\n    const c = new Context(request, {\n      path,\n      matchResult,\n      env,\n      executionCtx,\n      notFoundHandler: this.#notFoundHandler,\n    })\n\n    // Do not `compose` if it has only one handler\n    if (matchResult[0].length === 1) {\n      let res: ReturnType<H>\n      try {\n        res = matchResult[0][0][0][0](c, async () => {\n          c.res = await this.#notFoundHandler(c)\n        })\n      } catch (err) {\n        return this.#handleError(err, c)\n      }\n\n      return res instanceof Promise\n        ? res\n            .then(\n              (resolved: Response | undefined) =>\n                resolved || (c.finalized ? c.res : this.#notFoundHandler(c))\n            )\n            .catch((err: Error) => this.#handleError(err, c))\n        : (res ?? this.#notFoundHandler(c))\n    }\n\n    const composed = compose(matchResult[0], this.errorHandler, this.#notFoundHandler)\n\n    return (async () => {\n      try {\n        const context = await composed(c)\n        if (!context.finalized) {\n          throw new Error(\n            'Context is not finalized. Did you forget to return a Response object or `await next()`?'\n          )\n        }\n\n        return context.res\n      } catch (err) {\n        return this.#handleError(err, c)\n      }\n    })()\n  }"
+    },
+    "compose": {
+      "path": "src/compose.ts",
+      "startLine": 15,
+      "endLine": 73,
+      "symbol": "compose",
+      "kind": "function",
+      "content": "export const compose = <E extends Env = Env>(\n  middleware: [[Function, unknown], unknown][] | [[Function]][],\n  onError?: ErrorHandler<E>,\n  onNotFound?: NotFoundHandler<E>\n): ((context: Context, next?: Next) => Promise<Context>) => {\n  return (context, next) => {\n    let index = -1\n\n    return dispatch(0)\n\n    /**\n     * Dispatch the middleware functions.\n     *\n     * @param {number} i - The current index in the middleware array.\n     *\n     * @returns {Promise<Context>} - A promise that resolves to the context.\n     */\n    async function dispatch(i: number): Promise<Context> {\n      if (i <= index) {\n        throw new Error('next() called multiple times')\n      }\n      index = i\n\n      let res\n      let isError = false\n      let handler\n\n      if (middleware[i]) {\n        handler = middleware[i][0][0]\n        context.req.routeIndex = i\n      } else {\n        handler = (i === middleware.length && next) || undefined\n      }\n\n      if (handler) {\n        try {\n          res = await handler(context, () => dispatch(i + 1))\n        } catch (err) {\n          if (err instanceof Error && onError) {\n            context.error = err\n            res = await onError(err, context)\n            isError = true\n          } else {\n            throw err\n          }\n        }\n      } else {\n        if (context.finalized === false && onNotFound) {\n          res = await onNotFound(context)\n        }\n      }\n\n      if (res && (context.finalized === false || isError)) {\n        context.res = res\n      }\n      return context\n    }\n  }\n}"
+    },
+    "fetch": {
+      "path": "src/hono-base.ts",
+      "startLine": 498,
+      "endLine": 504,
+      "symbol": "fetch",
+      "kind": "method",
+      "content": "  fetch: (\n    request: Request,\n    env?: E['Bindings'] | {},\n    executionCtx?: ExecutionContext\n  ) => Response | Promise<Response> = (request, ...rest) => {\n    return this.#dispatch(request, rest[1], rest[0], request.method)\n  }"
+    },
+    "add-route": {
+      "path": "src/hono-base.ts",
+      "startLine": 405,
+      "endLine": 416,
+      "symbol": "#addRoute",
+      "kind": "method",
+      "content": "  #addRoute(method: string, path: string, handler: H, baseRoutePath?: string): void {\n    path = mergePath(this._basePath, path)\n    const r: RouterRoute = {\n      basePath:\n        baseRoutePath !== undefined ? mergePath(this._basePath, baseRoutePath) : this._basePath,\n      path,\n      method,\n      handler,\n    }\n    this.router.add(method, path, [handler, r])\n    this.routes.push(r)\n  }"
+    },
+    "cors": {
+      "path": "src/middleware/cors/index.ts",
+      "startLine": 63,
+      "endLine": 164,
+      "symbol": "cors",
+      "kind": "function",
+      "content": "export const cors = (options?: CORSOptions): MiddlewareHandler => {\n  const opts = {\n    origin: '*',\n    allowMethods: ['GET', 'HEAD', 'PUT', 'POST', 'DELETE', 'PATCH', 'QUERY'],\n    allowHeaders: [],\n    exposeHeaders: [],\n    ...options,\n  } satisfies CORSOptions\n\n  const exposeHeadersStr = opts.exposeHeaders?.length ? opts.exposeHeaders.join(',') : undefined\n  const allowHeadersStr = opts.allowHeaders?.length ? opts.allowHeaders.join(',') : undefined\n\n  const findAllowOrigin = ((optsOrigin) => {\n    if (typeof optsOrigin === 'string') {\n      if (optsOrigin === '*') {\n        return () => optsOrigin\n      } else {\n        return (origin: string) => (optsOrigin === origin ? origin : null)\n      }\n    } else if (typeof optsOrigin === 'function') {\n      return optsOrigin\n    } else {\n      return (origin: string) => (optsOrigin.includes(origin) ? origin : null)\n    }\n  })(opts.origin)\n\n  const findAllowMethods = ((optsAllowMethods) => {\n    if (typeof optsAllowMethods === 'function') {\n      return async (origin: string, c: Context) => (await optsAllowMethods(origin, c)).join(',')\n    } else if (Array.isArray(optsAllowMethods)) {\n      const methodsStr = optsAllowMethods.join(',')\n      return () => methodsStr\n    } else {\n      return () => ''\n    }\n  })(opts.allowMethods)\n\n  return async function cors(c, next) {\n    function set(key: string, value: string) {\n      c.res.headers.set(key, value)\n    }\n\n    const allowOrigin = await findAllowOrigin(c.req.header('origin') || '', c)\n    if (allowOrigin) {\n      set('Access-Control-Allow-Origin', allowOrigin)\n    }\n\n    if (opts.credentials) {\n      set('Access-Control-Allow-Credentials', 'true')\n    }\n\n    if (exposeHeadersStr) {\n      set('Access-Control-Expose-Headers', exposeHeadersStr)\n    }\n\n    if (c.req.method === 'OPTIONS') {\n      if (opts.origin !== '*') {\n        c.res.headers.append('Vary', 'Origin')\n      }\n\n      if (opts.maxAge != null) {\n        set('Access-Control-Max-Age', opts.maxAge.toString())\n      }\n\n      const allowMethods = await findAllowMethods(c.req.header('origin') || '', c)\n      if (allowMethods) {\n        set('Access-Control-Allow-Methods', allowMethods)\n      }\n\n      let headersStr = allowHeadersStr\n      if (!headersStr) {\n        const requestHeaders = c.req.header('Access-Control-Request-Headers')\n        if (requestHeaders) {\n          headersStr = requestHeaders\n            .split(',')\n            .map((h) => h.trim())\n            .join(',')\n        }\n      }\n      if (headersStr) {\n        set('Access-Control-Allow-Headers', headersStr)\n        c.res.headers.append('Vary', 'Access-Control-Request-Headers')\n      }\n\n      c.res.headers.delete('Content-Length')\n      c.res.headers.delete('Content-Type')\n\n      return new Response(null, {\n        headers: c.res.headers,\n        status: 204,\n        statusText: 'No Content',\n      })\n    }\n    await next()\n\n    // Suppose the server sends a response with an Access-Control-Allow-Origin value with an explicit origin (rather than the \"*\" wildcard).\n    // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Access-Control-Allow-Origin\n    if (opts.origin !== '*') {\n      c.header('Vary', 'Origin', { append: true })\n    }\n  }\n}"
+    },
+    "context-json": {
+      "path": "src/context.ts",
+      "startLine": 726,
+      "endLine": 739,
+      "symbol": "json",
+      "kind": "method",
+      "content": "  json: JSONRespond = <\n    T extends JSONValue | {} | InvalidJSONValue,\n    U extends ContentfulStatusCode = ContentfulStatusCode,\n  >(\n    object: T,\n    arg?: U | ResponseOrInit<U>,\n    headers?: HeaderRecord\n  ): JSONRespondReturn<T, U> => {\n    return this.#newResponse(\n      JSON.stringify(object),\n      arg,\n      setDefaultContentType('application/json', headers)\n    ) /* eslint-disable @typescript-eslint/no-explicit-any */ as any\n  }"
+    },
+    "readme-intro": {
+      "path": "README.md",
+      "startLine": 1,
+      "endLine": 33,
+      "symbol": null,
+      "kind": "window",
+      "content": "<div align=\"center\">\n  <a href=\"https://hono.dev\">\n    <img src=\"https://raw.githubusercontent.com/honojs/hono/main/docs/images/hono-title.png\" width=\"500\" height=\"auto\" alt=\"Hono\"/>\n  </a>\n</div>\n\n<hr />\n\n[![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/honojs/hono/ci.yml?branch=main)](https://github.com/honojs/hono/actions)\n[![GitHub](https://img.shields.io/github/license/honojs/hono)](https://github.com/honojs/hono/blob/main/LICENSE)\n[![npm](https://img.shields.io/npm/v/hono)](https://www.npmjs.com/package/hono)\n[![npm](https://img.shields.io/npm/dm/hono)](https://www.npmjs.com/package/hono)\n[![JSR](https://jsr.io/badges/@hono/hono)](https://jsr.io/@hono/hono)\n[![Bundle Size](https://img.shields.io/bundlephobia/min/hono)](https://bundlephobia.com/result?p=hono)\n[![Bundle Size](https://img.shields.io/bundlephobia/minzip/hono)](https://bundlephobia.com/result?p=hono)\n[![GitHub commit activity](https://img.shields.io/github/commit-activity/m/honojs/hono)](https://github.com/honojs/hono/pulse)\n[![GitHub last commit](https://img.shields.io/github/last-commit/honojs/hono)](https://github.com/honojs/hono/commits/main)\n[![codecov](https://codecov.io/github/honojs/hono/graph/badge.svg)](https://codecov.io/github/honojs/hono)\n[![Discord badge](https://img.shields.io/discord/1011308539819597844?label=Discord&logo=Discord)](https://discord.gg/KMh2eNSdxV)\n\nHono - _**means flame🔥 in Japanese**_ - is a small, simple, and ultrafast web framework built on Web Standards. It works on any JavaScript runtime: Cloudflare Workers, Fastly Compute, Deno, Bun, Vercel, AWS Lambda, Lambda@Edge, and Node.js.\n\nFast, but not only fast.\n\n```ts\nimport { Hono } from 'hono'\nconst app = new Hono()\n\napp.get('/', (c) => c.text('Hono!'))\n\nexport default app\n```\n"
+    },
+    "readme-features": {
+      "path": "README.md",
+      "startLine": 40,
+      "endLine": 47,
+      "symbol": "Features",
+      "kind": "heading",
+      "content": "## Features\n\n- **Ultrafast** 🚀 - The router `RegExpRouter` is really fast. Not using linear loops. Fast.\n- **Lightweight** 🪶 - The `hono/tiny` preset is under 12kB. Hono has zero dependencies and uses only the Web Standard API.\n- **Multi-runtime** 🌍 - Works on Cloudflare Workers, Fastly Compute, Deno, Bun, AWS Lambda, Lambda@Edge, or Node.js. The same code runs on all platforms.\n- **Batteries Included** 🔋 - Hono has built-in middleware, custom middleware, and third-party middleware. Batteries included.\n- **Delightful DX** 😃 - Super clean APIs. First-class TypeScript support. Now, we've got \"Types\".\n"
+    }
+  },
+  "flask": {
+    "call": {
+      "path": "src/flask/app.py",
+      "startLine": 1679,
+      "endLine": 1686,
+      "symbol": "__call__",
+      "kind": "method",
+      "content": "    def __call__(\n        self, environ: WSGIEnvironment, start_response: StartResponse\n    ) -> cabc.Iterable[bytes]:\n        \"\"\"The WSGI server calls the Flask application object as the\n        WSGI application. This calls :meth:`wsgi_app`, which can be\n        wrapped to apply middleware.\n        \"\"\"\n        return self.wsgi_app(environ, start_response)"
+    },
+    "wsgi-app": {
+      "path": "src/flask/app.py",
+      "startLine": 1627,
+      "endLine": 1677,
+      "symbol": "wsgi_app",
+      "kind": "method",
+      "content": "    def wsgi_app(\n        self, environ: WSGIEnvironment, start_response: StartResponse\n    ) -> cabc.Iterable[bytes]:\n        \"\"\"The actual WSGI application. This is not implemented in\n        :meth:`__call__` so that middlewares can be applied without\n        losing a reference to the app object. Instead of doing this::\n\n            app = MyMiddleware(app)\n\n        It's a better idea to do this instead::\n\n            app.wsgi_app = MyMiddleware(app.wsgi_app)\n\n        Then you still have the original application object around and\n        can continue to call methods on it.\n\n        .. versionchanged:: 0.7\n            Teardown events for the request and app contexts are called\n            even if an unhandled error occurs. Other events may not be\n            called depending on when an error occurs during dispatch.\n\n        :param environ: A WSGI environment.\n        :param start_response: A callable accepting a status code,\n            a list of headers, and an optional exception context to\n            start the response.\n        \"\"\"\n        ctx = self.request_context(environ)\n        error: BaseException | None = None\n        try:\n            try:\n                ctx.push()\n                response = self.full_dispatch_request(ctx)\n            except Exception as e:\n                error = e\n                response = self.handle_exception(ctx, e)\n            except:\n                error = sys.exc_info()[1]\n                raise\n            return response(environ, start_response)\n        finally:\n            if \"werkzeug.debug.preserve_context\" in environ:\n                environ[\"werkzeug.debug.preserve_context\"](ctx)\n\n            if (\n                error is not None\n                and self.should_ignore_error is not None\n                and self.should_ignore_error(error)\n            ):\n                error = None\n\n            ctx.pop(error)"
+    },
+    "full-dispatch": {
+      "path": "src/flask/app.py",
+      "startLine": 1023,
+      "endLine": 1054,
+      "symbol": "full_dispatch_request",
+      "kind": "method",
+      "content": "    def full_dispatch_request(self, ctx: AppContext) -> Response:\n        \"\"\"Dispatches the request and on top of that performs request\n        pre and postprocessing as well as HTTP exception catching and\n        error handling.\n\n        .. versionchanged:: 3.2\n            Takes ``ctx: AppContext`` as the first parameter. The old signature\n            is deprecated and will not be supported in Flask 4.0.\n\n        .. versionadded:: 0.7\n        \"\"\"\n        if not self._got_first_request and self.should_ignore_error is not None:\n            import warnings\n\n            warnings.warn(\n                \"The 'should_ignore_error' method is deprecated and will\"\n                \" be removed in Flask 3.3. Handle errors as needed in\"\n                \" teardown handlers instead.\",\n                DeprecationWarning,\n                stacklevel=1,\n            )\n\n        self._got_first_request = True\n\n        try:\n            request_started.send(self, _async_wrapper=self.ensure_sync)\n            rv = self.preprocess_request(ctx)\n            if rv is None:\n                rv = self.dispatch_request(ctx)\n        except Exception as e:\n            rv = self.handle_user_exception(ctx, e)\n        return self.finalize_request(ctx, rv)"
+    },
+    "dispatch-request": {
+      "path": "src/flask/app.py",
+      "startLine": 993,
+      "endLine": 1021,
+      "symbol": "dispatch_request",
+      "kind": "method",
+      "content": "    def dispatch_request(self, ctx: AppContext) -> ft.ResponseReturnValue:\n        \"\"\"Does the request dispatching.  Matches the URL and returns the\n        return value of the view or error handler.  This does not have to\n        be a response object.  In order to convert the return value to a\n        proper response object, call :func:`make_response`.\n\n        .. versionchanged:: 3.2\n            Takes ``ctx: AppContext`` as the first parameter. The old signature\n            is deprecated and will not be supported in Flask 4.0.\n\n        .. versionchanged:: 0.7\n           This no longer does the exception handling, this code was\n           moved to the new :meth:`full_dispatch_request`.\n        \"\"\"\n        req = ctx.request\n\n        if req.routing_exception is not None:\n            self.raise_routing_exception(req)\n        rule: Rule = req.url_rule  # type: ignore[assignment]\n        # if we provide automatic options for this URL and the\n        # request came with the OPTIONS method, reply automatically\n        if (\n            getattr(rule, \"provide_automatic_options\", False)\n            and req.method == \"OPTIONS\"\n        ):\n            return self.make_default_options_response(ctx)\n        # otherwise dispatch to the handler for that endpoint\n        view_args: dict[str, t.Any] = req.view_args  # type: ignore[assignment]\n        return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]"
+    },
+    "preprocess": {
+      "path": "src/flask/app.py",
+      "startLine": 1409,
+      "endLine": 1439,
+      "symbol": "preprocess_request",
+      "kind": "method",
+      "content": "    def preprocess_request(self, ctx: AppContext) -> ft.ResponseReturnValue | None:\n        \"\"\"Called before the request is dispatched. Calls\n        :attr:`url_value_preprocessors` registered with the app and the\n        current blueprint (if any). Then calls :attr:`before_request_funcs`\n        registered with the app and the blueprint.\n\n        If any :meth:`before_request` handler returns a non-None value, the\n        value is handled as if it was the return value from the view, and\n        further request handling is stopped.\n\n        .. versionchanged:: 3.2\n            Takes ``ctx: AppContext`` as the first parameter. The old signature\n            is deprecated and will not be supported in Flask 4.0.\n        \"\"\"\n        req = ctx.request\n        names = (None, *reversed(req.blueprints))\n\n        for name in names:\n            if name in self.url_value_preprocessors:\n                for url_func in self.url_value_preprocessors[name]:\n                    url_func(req.endpoint, req.view_args)\n\n        for name in names:\n            if name in self.before_request_funcs:\n                for before_func in self.before_request_funcs[name]:\n                    rv = self.ensure_sync(before_func)()\n\n                    if rv is not None:\n                        return rv  # type: ignore[no-any-return]\n\n        return None"
+    },
+    "finalize": {
+      "path": "src/flask/app.py",
+      "startLine": 1056,
+      "endLine": 1090,
+      "symbol": "finalize_request",
+      "kind": "method",
+      "content": "    def finalize_request(\n        self,\n        ctx: AppContext,\n        rv: ft.ResponseReturnValue | HTTPException,\n        from_error_handler: bool = False,\n    ) -> Response:\n        \"\"\"Given the return value from a view function this finalizes\n        the request by converting it into a response and invoking the\n        postprocessing functions.  This is invoked for both normal\n        request dispatching as well as error handlers.\n\n        Because this means that it might be called as a result of a\n        failure a special safe mode is available which can be enabled\n        with the `from_error_handler` flag.  If enabled, failures in\n        response processing will be logged and otherwise ignored.\n\n        .. versionchanged:: 3.2\n            Takes ``ctx: AppContext`` as the first parameter. The old signature\n            is deprecated and will not be supported in Flask 4.0.\n\n        :meta private:\n        \"\"\"\n        response = self.make_response(rv)\n        try:\n            response = self.process_response(ctx, response)\n            request_finished.send(\n                self, _async_wrapper=self.ensure_sync, response=response\n            )\n        except Exception:\n            if not from_error_handler:\n                raise\n            self.logger.exception(\n                \"Request finalizing failed with an error while handling an error\"\n            )\n        return response"
+    },
+    "route": {
+      "path": "src/flask/sansio/scaffold.py",
+      "startLine": 344,
+      "endLine": 373,
+      "symbol": "route",
+      "kind": "method",
+      "content": "    def route(self, rule: str, **options: t.Any) -> t.Callable[[T_route], T_route]:\n        \"\"\"Decorate a view function to register it with the given URL\n        rule and options. Calls :meth:`add_url_rule`, which has more\n        details about the implementation.\n\n        .. code-block:: python\n\n            @app.route(\"/\")\n            def index():\n                return \"Hello, World!\"\n\n        See :ref:`url-route-registrations`.\n\n        The endpoint name for the route defaults to the name of the view\n        function if the ``endpoint`` parameter isn't passed.\n\n        The ``methods`` parameter defaults to ``[\"GET\"]``. ``HEAD`` and\n        ``OPTIONS`` are added automatically.\n\n        :param rule: The URL rule string.\n        :param options: Extra options passed to the\n            :class:`~werkzeug.routing.Rule` object.\n        \"\"\"\n\n        def decorator(f: T_route) -> T_route:\n            endpoint = options.pop(\"endpoint\", None)\n            self.add_url_rule(rule, endpoint, f, **options)\n            return f\n\n        return decorator"
+    },
+    "add-url-rule": {
+      "path": "src/flask/sansio/app.py",
+      "startLine": 606,
+      "endLine": 662,
+      "symbol": "add_url_rule",
+      "kind": "method",
+      "content": "    def add_url_rule(\n        self,\n        rule: str,\n        endpoint: str | None = None,\n        view_func: ft.RouteCallable | None = None,\n        provide_automatic_options: bool | None = None,\n        **options: t.Any,\n    ) -> None:\n        if endpoint is None:\n            endpoint = _endpoint_from_view_func(view_func)  # type: ignore\n        options[\"endpoint\"] = endpoint\n        methods = options.pop(\"methods\", None)\n\n        # if the methods are not given and the view_func object knows its\n        # methods we can use that instead.  If neither exists, we go with\n        # a tuple of only ``GET`` as default.\n        if methods is None:\n            methods = getattr(view_func, \"methods\", None) or (\"GET\",)\n        if isinstance(methods, str):\n            raise TypeError(\n                \"Allowed methods must be a list of strings, for\"\n                ' example: @app.route(..., methods=[\"POST\"])'\n            )\n        methods = {item.upper() for item in methods}\n\n        # Methods that should always be added\n        required_methods: set[str] = set(getattr(view_func, \"required_methods\", ()))\n\n        if provide_automatic_options is None:\n            provide_automatic_options = getattr(\n                view_func, \"provide_automatic_options\", None\n            )\n\n            if provide_automatic_options is None:\n                provide_automatic_options = (\n                    \"OPTIONS\" not in methods\n                    and self.config[\"PROVIDE_AUTOMATIC_OPTIONS\"]\n                )\n\n        if provide_automatic_options:\n            required_methods.add(\"OPTIONS\")\n\n        # Add the required methods now.\n        methods |= required_methods\n\n        rule_obj = self.url_rule_class(rule, methods=methods, **options)\n        rule_obj.provide_automatic_options = provide_automatic_options  # type: ignore[attr-defined]\n\n        self.url_map.add(rule_obj)\n        if view_func is not None:\n            old_func = self.view_functions.get(endpoint)\n            if old_func is not None and old_func != view_func:\n                raise AssertionError(\n                    \"View function mapping is overwriting an existing\"\n                    f\" endpoint function: {endpoint}\"\n                )\n            self.view_functions[endpoint] = view_func"
+    },
+    "readme-intro": {
+      "path": "README.md",
+      "startLine": 3,
+      "endLine": 18,
+      "symbol": "Flask",
+      "kind": "heading",
+      "content": "# Flask\n\nFlask is a lightweight [WSGI] web application framework. It is designed\nto make getting started quick and easy, with the ability to scale up to\ncomplex applications. It began as a simple wrapper around [Werkzeug]\nand [Jinja], and has become one of the most popular Python web\napplication frameworks.\n\nFlask offers suggestions, but doesn't enforce any dependencies or\nproject layout. It is up to the developer to choose the tools and\nlibraries they want to use. There are many extensions provided by the\ncommunity that make adding new functionality easy.\n\n[WSGI]: https://wsgi.readthedocs.io/\n[Werkzeug]: https://werkzeug.palletsprojects.com/\n[Jinja]: https://jinja.palletsprojects.com/"
+    },
+    "readme-example": {
+      "path": "README.md",
+      "startLine": 20,
+      "endLine": 36,
+      "symbol": "A Simple Example",
+      "kind": "heading",
+      "content": "## A Simple Example\n\n```python\n# save this as app.py\nfrom flask import Flask\n\napp = Flask(__name__)\n\n@app.route(\"/\")\ndef hello():\n    return \"Hello, World!\"\n```\n\n```\n$ flask run\n  * Running on http://127.0.0.1:5000/ (Press CTRL+C to quit)\n```"
+    }
+  }
+}

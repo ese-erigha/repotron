@@ -4,6 +4,18 @@ on:
   push:
     branches:
       - develop
+    paths:
+      - 'apps/gateway/**'
+      - 'apps/pipeline/**'
+      - 'apps/indexer/**'
+      - 'packages/**'
+      - 'infra/**'
+      - 'scripts/**'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'package.json'
+      - 'turbo.json'
+      - '.github/workflows/deploy-staging.yml'
   workflow_dispatch:
     inputs:
       apply_migrations:
@@ -21,11 +33,6 @@ on:
         required: false
         type: boolean
         default: false
-      force_deploy_web:
-        description: "Deploy the web Worker even when web files did not change?"
-        required: false
-        type: boolean
-        default: false
 
 env:
   CF_SEND_TELEMETRY: "false"
@@ -38,7 +45,6 @@ jobs:
       migrations: ${{ steps.changes.outputs.migrations }}
       gateway: ${{ steps.changes.outputs.gateway }}
       pipeline: ${{ steps.changes.outputs.pipeline }}
-      web: ${{ steps.changes.outputs.web }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -52,7 +58,6 @@ jobs:
             echo "migrations=${{ inputs.apply_migrations }}" >> $GITHUB_OUTPUT
             echo "gateway=${{ inputs.force_deploy_gateway }}" >> $GITHUB_OUTPUT
             echo "pipeline=${{ inputs.force_deploy_pipeline }}" >> $GITHUB_OUTPUT
-            echo "web=${{ inputs.force_deploy_web }}" >> $GITHUB_OUTPUT
             exit 0
           fi
 
@@ -60,7 +65,6 @@ jobs:
             echo "migrations=true" >> $GITHUB_OUTPUT
             echo "gateway=true" >> $GITHUB_OUTPUT
             echo "pipeline=true" >> $GITHUB_OUTPUT
-            echo "web=true" >> $GITHUB_OUTPUT
             echo "First push to branch — will run applicable jobs"
             exit 0
           fi
@@ -83,12 +87,6 @@ jobs:
             echo "pipeline=true" >> $GITHUB_OUTPUT
           else
             echo "pipeline=false" >> $GITHUB_OUTPUT
-          fi
-
-          if echo "$changed_files" | grep -qE '^(apps/web/|packages/|pnpm-lock\.yaml|\.github/workflows/deploy-staging\.yml)'; then
-            echo "web=true" >> $GITHUB_OUTPUT
-          else
-            echo "web=false" >> $GITHUB_OUTPUT
           fi
 
   test:
@@ -264,4 +262,3 @@ jobs:
           echo "- Migrations requested: ${{ needs.detect-changes.outputs.migrations }}"
           echo "- Gateway changes: ${{ needs.detect-changes.outputs.gateway }}"
           echo "- Pipeline changes: ${{ needs.detect-changes.outputs.pipeline }}"
-          echo "- Web changes: ${{ needs.detect-changes.outputs.web }}"
