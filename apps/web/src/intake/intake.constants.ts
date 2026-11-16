@@ -13,6 +13,7 @@ export const INTAKE_TEXT = {
   LINK_HINT: `Public repositories up to ${REPOSITORY_MAX_KILOBYTES / KILOBYTES_PER_MEGABYTE} MB`,
   INVALID_LINK: 'Enter the link of a GitHub repository, such as https://github.com/owner/repository',
   SUBMIT: 'Index',
+  STARTED_TITLE: 'In this browser',
   RECENT_TITLE: 'Recently indexed',
   RECENT_EMPTY: 'No repository is indexed yet.',
   RECENT_FAILED: 'The recent list could not load.',

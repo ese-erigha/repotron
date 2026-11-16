@@ -5,7 +5,7 @@ const container = defineContainer({
   name: 'repotron-staging-indexer',
   image: { dockerfile: '../indexer/Dockerfile' },
   instanceType: 'standard-2',
-  maxInstances: 5,
+  maxInstances: 10,
 })
 
 export default defineConfig({

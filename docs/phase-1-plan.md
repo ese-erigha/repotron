@@ -325,7 +325,7 @@ Every name uses `repotron-staging-<role>`.
   - Worker `repotron-staging-pipeline` — no public route
   - Workflow `repotron-staging-repository-indexing`, class `RepositoryIndexing`
   - Workflow `repotron-staging-index-deletion`, class `IndexDeletion`
-  - Container `repotron-staging-indexer`, attached to the Durable Object class `Indexer`. Instance type `standard-2`. `maxInstances` 5.
+  - Container `repotron-staging-indexer`, attached to the Durable Object class `Indexer`. Instance type `standard-2`. `maxInstances` 10.
 - **Cloudflare, created by CI** (`scripts/ensure-resources-staging.sh`). Each binding names these resources, so CI can create them before the deploy.
   - R2 bucket `repotron-staging-batches`
   - Vectorize index `repotron-staging-chunks`: 768 dimensions, `cosine`, and string metadata indexes on `path`, `language`, and `kind`
@@ -620,7 +620,7 @@ export default defineConfig({
 - **Exports**
   - `RepositoryIndexing` — `exports.workflow({ name: "repotron-staging-repository-indexing" })`
   - `IndexDeletion` — `exports.workflow({ name: "repotron-staging-index-deletion" })`
-  - `Indexer` — `exports.durableObject({ storage: "sqlite", container })`. `container` comes from `defineContainer` with `image: { dockerfile: "../indexer/Dockerfile" }`, `instanceType: "standard-2"`, and `maxInstances: 5`.
+  - `Indexer` — `exports.durableObject({ storage: "sqlite", container })`. `container` comes from `defineContainer` with `image: { dockerfile: "../indexer/Dockerfile" }`, `instanceType: "standard-2"`, and `maxInstances: 10`.
 - **Triggers:** `triggers.scheduled({ schedule: "0 4 * * *" })`
 - **Bindings**
   - `DB`, `CHUNK_VECTORS`, and `AI`, as on the gateway
@@ -1025,7 +1025,7 @@ These rules hold in every stage. A change that breaks one is a defect.
 
 - **Vectorize processing time.** Step 6 waits up to 5 minutes. A slower index fails the job at the `embedding` stage. The staging check of stage 11 measures the time.
 - **Container cold start.** I did not measure the image size or the start time. Both count against the 5-minute target.
-- **Container concurrency.** `maxInstances` is 5. A sixth parallel job fails step 2, then retries with backoff. Measure the queue time on staging.
+- **Container concurrency.** `maxInstances` is 10. An eleventh parallel job fails step 2, then retries with backoff. Measure the queue time on staging.
 - **Dockerfile path.** I did not confirm that `cf` uses the folder of the Dockerfile as the build context. The first pipeline deploy in stage 7 proves it.
 - **Embedding batch size.** The model page states no limit for each call. The staging check of stage 11 sets the value.
 - **Vectorize delete batch size.** I did not find a documented limit for `deleteByIds`. 500 ids stays under the upsert limit of 1,000. The staging check of stage 14 proves it.

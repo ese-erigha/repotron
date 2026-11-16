@@ -198,7 +198,7 @@ A failed step after its retries sets the status to `failed`, with the stage and 
 2. Delete one page of 500 chunks for each step: the vectors by id, then the `source_chunks` rows. Repeat until no chunk is left.
 3. Delete the `repository_indexes` row. The `answered_questions` rows stay, so each share link still works.
 
-**Indexer Container class.** It extends `Container` from `@cloudflare/containers`. The Durable Object name is the index id, so one job owns one container. The starting instance type is `standard-2`: 1 vCPU, 6 GiB memory, and 12 GB disk. `maxInstances` is 5.
+**Indexer Container class.** It extends `Container` from `@cloudflare/containers`. The Durable Object name is the index id, so one job owns one container. The starting instance type is `standard-2`: 1 vCPU, 6 GiB memory, and 12 GB disk. `maxInstances` is 10.
 
 Cloudflare bills memory and disk for each second that the container is awake, including idle time. So the Workflow stops the container as soon as the parse ends. The sleep timeout is 1 minute. That timeout stops a container that step 3 did not reach, such as after a failed parse.
 
