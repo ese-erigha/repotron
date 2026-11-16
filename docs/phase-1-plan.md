@@ -179,7 +179,7 @@ The ask screen URL is `/r/:owner/:repo?index=<indexId>`. A reload reads `GET /ap
 These values are guesses until staging measures them. Each one lives in `packages/domain`.
 
 - `MAX_CHUNK_TOKENS` = 1,500 (`tiktoken` `cl100k_base`). The value leaves room under the 8,192-token window of the embedding model, because the Gemma tokenizer counts differently. 8 chunks then stay near 12,000 input tokens for the answer model.
-- `EMBED_BATCH_SIZE` = 4 texts in each Workers AI call. Four chunks at `MAX_CHUNK_TOKENS` stay under the model's 8,192-token request limit.
+- `EMBED_BATCH_SIZE` = 1 text in each Workers AI call. The model limit of 8,192 tokens is the sum of the texts in one request. One chunk at `MAX_CHUNK_TOKENS` stays under that limit.
 - `QUESTION_MAX_CHARS` = 1,000. The value validates the question at the boundary.
 
 ### Decision I: The deploy branch
@@ -921,7 +921,7 @@ Python 3.12 and uv. Dependencies: `fastapi`, `uvicorn`, `tree-sitter`, `tree-sit
   - Limits:
     - `REPOSITORY_MAX_KILOBYTES` (512,000), `REPOSITORY_MAX_FILES` (20,000), and `FILE_MAX_BYTES` (1,048,576)
     - `MAX_CHUNK_TOKENS` (1,500), `LINE_WINDOW` (60), `LINE_OVERLAP` (10), and `CHUNK_BATCH_SIZE` (500)
-    - `EMBED_BATCH_SIZE` (4), `DELETE_PAGE_SIZE` (500), and `CONTEXT_CHUNKS` (8)
+    - `EMBED_BATCH_SIZE` (1), `DELETE_PAGE_SIZE` (500), and `CONTEXT_CHUNKS` (8)
     - `START_HERE_MAX_PATHS` (500), `QUESTION_MAX_CHARS` (1,000), `RECENT_INDEX_COUNT` (10), and `INDEX_RETENTION_DAYS` (30)
     - `INDEX_REQUESTS_PER_HOUR` (5), `QUESTIONS_PER_HOUR` (30), and `STATUS_POLL_MS` (2,000)
   - Models: `EMBEDDING_MODEL_ID` (`@cf/google/embeddinggemma-2`) and `EMBEDDING_DIMENSIONS` (768)

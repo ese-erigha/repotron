@@ -226,7 +226,7 @@ Python 3.12. One uv project with its own `uv.lock`, because the Docker build con
 - A function, a method, a class, an interface, and a type declaration each become one chunk.
 - A node over `MAX_CHUNK_TOKENS` splits at its child nodes. A class keeps its signature line as a header on each part.
 - Top-level code between declarations, such as imports and constants, joins into one chunk per file region. A region over `MAX_CHUNK_TOKENS` splits into parts of that size.
-- A Markdown file splits at its headings. Other files use 60-line windows with a 10-line overlap.
+- A Markdown file splits at its headings. A section over `MAX_CHUNK_TOKENS` splits into parts of that size. Other files use 60-line windows with a 10-line overlap. A window over that token cap splits the same way.
 - Each chunk holds:
   - `id` (`<indexId>:<seq>`), `path`, `language`, `symbol`, `kind`, `startLine`, and `endLine`
   - `content`: the source lines
@@ -270,7 +270,7 @@ AI Gateway fronts each model call. It records the model id, the tokens, and the 
 - **Embeddings.** Phase 1 starts with the Workers AI model `@cf/google/embeddinggemma-2`. It covers code, gives 768 dimensions, and has an 8,192-token context window.
   - The model id is the constant `EMBEDDING_MODEL_ID` in `packages/domain`, not a Worker var. The gateway and the pipeline must use the same model, and the Vectorize dimension depends on it.
   - The model expects task prefixes. A question becomes `task: search result | query: <question>`. A chunk uses the `title` and `text` form in the chunk rules.
-  - One request allows 8,192 tokens. `EMBED_BATCH_SIZE` is 4, so four chunks at the 1,500-token cap stay under that limit.
+  - One request allows 8,192 tokens. That limit is the sum of every text in the request. `EMBED_BATCH_SIZE` is 1, so one chunk at the 1,500-token cap stays under that limit.
   - Phase 3 compares it with `voyage-code-3` and `text-embedding-3-small` through AI Gateway. Each candidate fits the Vectorize limit of 1536 dimensions.
 - **Reranker.** Phase 3 starts with Workers AI `bge-reranker-base`. The ablation compares it with Cohere Rerank through AI Gateway.
 - **Answer model.** OpenRouter model `anthropic/claude-haiku-5.5`, through the AI Gateway OpenRouter route. Stream the tokens. Temperature 0. The Worker var is `ANSWER_MODEL_ID`. The gateway calls it with `fetch`, with no SDK.
@@ -435,7 +435,7 @@ repotron/
     └── migrations/              # D1 SQL
 ```
 
-`packages/domain` holds the Phase 1 constants. Examples: `MAX_CHUNK_TOKENS` (1,500, a starting value), `CONTEXT_CHUNKS` (8), `EMBED_BATCH_SIZE` (4), `START_HERE_MAX_PATHS` (500), and `EMBEDDING_MODEL_ID`. Phase 3 adds `RRF_K` (60), `RETRIEVAL_TOP_K` (50), `CONFIDENCE_HIGH` (0.7), and `CONFIDENCE_MEDIUM` (0.3).
+`packages/domain` holds the Phase 1 constants. Examples: `MAX_CHUNK_TOKENS` (1,500, a starting value), `CONTEXT_CHUNKS` (8), `EMBED_BATCH_SIZE` (1), `START_HERE_MAX_PATHS` (500), and `EMBEDDING_MODEL_ID`. Phase 3 adds `RRF_K` (60), `RETRIEVAL_TOP_K` (50), `CONFIDENCE_HIGH` (0.7), and `CONFIDENCE_MEDIUM` (0.3).
 
 `MAX_CHUNK_TOKENS` keeps the header and the content under the 8,192-token window of the embedding model. `tiktoken` counts tokens differently from the Gemma tokenizer, so the value leaves a margin.
 

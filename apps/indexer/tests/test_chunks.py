@@ -55,6 +55,15 @@ def test_when_a_class_is_large_then_it_splits_at_its_methods_and_keeps_its_heade
     _validate(method_chunks)
 
 
+def test_when_a_markdown_section_exceeds_the_token_limit_then_it_splits_into_parts() -> None:
+    source = "# Start\n\n" + ("word " * 20 + "\n") * 200
+    chunks = chunk_text("README.md", source, "markdown")
+    assert len(chunks) == 3
+    assert [chunk["symbol"] for chunk in chunks] == ["Start", "Start", "Start"]
+    assert "".join(str(chunk["content"]) for chunk in chunks) == "\n".join(source.splitlines())
+    _validate(chunks)
+
+
 def test_when_markdown_has_headings_then_it_splits_at_each_heading() -> None:
     source = "# Start\n\nIntro\n\n## Next\n\nBody\n"
     chunks = chunk_text("README.md", source, "markdown")

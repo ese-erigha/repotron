@@ -1,11 +1,11 @@
 from typing import Final
 
-import tiktoken
 from tree_sitter import Node
 from tree_sitter_language_pack import get_parser
 
 from indexer.limits import MAX_CHUNK_TOKENS
 from indexer.split_identifiers import join_identifiers
+from indexer.tokens import token_count, token_parts
 
 _NODE_KIND: Final = {
     "function_definition": "function",
@@ -32,7 +32,6 @@ _BODY_TYPES: Final = frozenset(
 _IDENTIFIER_TYPES: Final = frozenset(
     {"identifier", "type_identifier", "property_identifier", "field_identifier"}
 )
-_ENCODING = tiktoken.get_encoding("cl100k_base")
 
 
 def chunk_code(path: str, text: str, language: str) -> list[dict[str, object]]:
@@ -95,7 +94,7 @@ def _declaration_chunks(
     content = source[outer.start_byte : outer.end_byte].decode()
     symbol = _symbol(inner)
     header = parent_header or (f"{path} {symbol}" if symbol else path)
-    if _token_count(content) <= MAX_CHUNK_TOKENS:
+    if token_count(content) <= MAX_CHUNK_TOKENS:
         return [_record(path, source, outer, language, kind, symbol, header, content)]
     children = _declarations(inner, inside_class=True)
     if not children:
@@ -121,7 +120,7 @@ def _module_region(
     start_line = source[:start].count(b"\n") + 1
     end_line = max(start_line + content.count("\n"), start_line)
     text = content.strip("\n")
-    parts = [text] if _token_count(text) <= MAX_CHUNK_TOKENS else _token_parts(text)
+    parts = token_parts(text)
     return [_module_chunk(path, language, part, start_line, end_line) for part in parts]
 
 
@@ -152,19 +151,11 @@ def _split_oversized(
     content: str,
 ) -> list[dict[str, object]]:
     chunks: list[dict[str, object]] = []
-    for part in _token_parts(content):
+    for part in token_parts(content):
         record = _record(path, source, outer, language, kind, symbol, header, part)
         record["content"] = part
         chunks.append(record)
     return chunks
-
-
-def _token_parts(content: str) -> list[str]:
-    tokens = _ENCODING.encode(content)
-    return [
-        _ENCODING.decode(tokens[start : start + MAX_CHUNK_TOKENS])
-        for start in range(0, len(tokens), MAX_CHUNK_TOKENS)
-    ]
 
 
 def _record(
@@ -204,7 +195,3 @@ def _identifiers(node: Node) -> list[str]:
     for child in node.children:
         names.extend(_identifiers(child))
     return names
-
-
-def _token_count(content: str) -> int:
-    return len(_ENCODING.encode(content))

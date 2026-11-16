@@ -1,4 +1,5 @@
 from indexer.limits import LINE_OVERLAP, LINE_WINDOW
+from indexer.tokens import token_parts
 
 
 def chunk_text(path: str, text: str, language: str) -> list[dict[str, object]]:
@@ -58,8 +59,9 @@ def _one_chunk(
             "kind": kind,
             "startLine": start + 1,
             "endLine": end,
-            "content": content,
+            "content": part,
             "header": header,
             "identifiers": "",
         }
+        for part in token_parts(content)
     ]
