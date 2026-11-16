@@ -1,3 +1,4 @@
+import { log } from 'log'
 import { z } from 'zod'
 
 const parseResultSchema = z.object({
@@ -10,7 +11,10 @@ export type ParseResult = z.infer<typeof parseResultSchema>
 
 export async function readParseResult(response: Response): Promise<ParseResult> {
   const body: unknown = await response.json()
-  if (!response.ok) throw new Error(readReason(body))
+  if (!response.ok) {
+    log.error('parse_failed', response.status, body)
+    throw new Error(readReason(body))
+  }
   return parseResultSchema.parse(body)
 }
 

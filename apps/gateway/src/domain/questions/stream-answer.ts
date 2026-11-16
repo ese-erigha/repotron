@@ -10,6 +10,8 @@ import {
   type Preset,
 } from 'repotron-domain'
 
+import { log } from 'log'
+
 import { getConfig, getRepositories, waitUntil } from '../../context.ts'
 import { buildPrompt } from './build-prompt.ts'
 
@@ -47,8 +49,8 @@ async function writeAnswer(controller: ReadableStreamDefaultController<Uint8Arra
     send(STREAM_EVENT.done, done)
     waitUntil(saveQuestion(input, citations, answer.text, done))
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'The answer failed.'
-    send(STREAM_EVENT.error, { code: ERROR_CODE.internal, message })
+    log.error('answer_failed', input.index.id, error)
+    send(STREAM_EVENT.error, { code: ERROR_CODE.internal, message: 'The answer failed.' })
   } finally {
     controller.close()
   }

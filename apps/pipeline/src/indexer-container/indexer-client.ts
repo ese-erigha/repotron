@@ -31,7 +31,7 @@ export async function stopContainer(indexId: string): Promise<void> {
   try {
     await containerFor(indexId).destroy()
   } catch (error) {
-    log.error('container_stop_failed', indexId, error instanceof Error ? error.name : 'Error')
+    log.error('container_stop_failed', indexId, error)
   }
 }
 

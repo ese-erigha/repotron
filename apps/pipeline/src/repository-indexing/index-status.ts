@@ -47,12 +47,25 @@ export async function deleteEarlierIndexes(indexId: string): Promise<void> {
   await startDeletions(earlier.map((row) => row.id))
 }
 
+const REASON_MAX_LENGTH = 200
+
 export function failureReason(error: unknown, stage: IndexStatus): string {
-  const message = error instanceof Error ? error.message : ''
-  if (message !== '' && message.length <= 200 && !message.includes('Bearer') && !message.includes('ghp_')) {
-    return message
+  const message = sanitizeReason(messageOf(error))
+  if (message === '') return `Indexing failed at the ${stage} stage.`
+  return message.length <= REASON_MAX_LENGTH ? message : message.slice(0, REASON_MAX_LENGTH)
+}
+
+function messageOf(error: unknown): string {
+  if (error instanceof Error) return error.message
+  if (typeof error === 'string') return error
+  if (typeof error === 'object' && error !== null && 'message' in error && typeof error.message === 'string') {
+    return error.message
   }
-  return `Indexing failed at the ${stage} stage.`
+  return ''
+}
+
+function sanitizeReason(message: string): string {
+  return message.replace(/Bearer\s+\S+/gi, 'Bearer').replace(/ghp_\S+/g, '').trim()
 }
 
 export { INDEX_STATUS }

@@ -56,7 +56,7 @@ export class RepositoryIndexing extends WorkflowEntrypoint<Record<string, unknow
         pipelineStorage.run(context, () => deleteEarlierIndexes(params.indexId)),
       )
     } catch (error) {
-      await failIndexing(step, context, params.indexId, stage, failureReason(error, stage), batchKeys)
+      await failIndexing(step, context, params.indexId, stage, error, batchKeys)
     }
   }
 }
@@ -81,12 +81,13 @@ async function failIndexing(
   context: ReturnType<typeof pipelineContext>,
   indexId: string,
   stage: IndexStatus,
-  reason: string,
+  error: unknown,
   batchKeys: string[],
 ): Promise<void> {
+  const reason = failureReason(error, stage)
   await step.do('mark failed', STEP, () =>
     pipelineStorage.run(context, async () => {
-      log.error('indexing_failed', indexId, stage, reason)
+      log.error('indexing_failed', indexId, stage, error)
       await markFailed(indexId, stage, reason)
     }),
   )

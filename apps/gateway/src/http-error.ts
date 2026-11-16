@@ -1,4 +1,5 @@
 import type { Context } from 'hono'
+import { log } from 'log'
 import { ERROR_CODE, type ErrorCode } from 'repotron-domain'
 import type { ZodType } from 'zod'
 
@@ -19,7 +20,10 @@ export class RequestError extends Error {
 
 export function parseRequest<T>(schema: ZodType<T>, value: unknown): T {
   const parsed = schema.safeParse(value)
-  if (!parsed.success) throw new RequestError(400, ERROR_CODE.validationFailed, 'The request is invalid.')
+  if (!parsed.success) {
+    log.error('request_invalid', parsed.error)
+    throw new RequestError(400, ERROR_CODE.validationFailed, 'The request is invalid.')
+  }
   return parsed.data
 }
 
@@ -28,5 +32,6 @@ export function handleErrors(c: Context, error: unknown): Response {
     if (error.retryAfterSeconds !== undefined) c.header('Retry-After', String(error.retryAfterSeconds))
     return c.json({ error: { code: error.code, message: error.message } }, error.status)
   }
+  log.error('gateway_failed', error)
   return c.json({ error: { code: ERROR_CODE.internal, message: 'Something went wrong.' } }, 500)
 }

@@ -121,7 +121,7 @@ The browser reads `ready` on its next poll and opens the ask screen.
 
 ### Failure — pipeline Worker
 
-A step that fails after its retries sets the status to `failed`. The pipeline Worker logs `indexing_failed` with the index id, the stage, and the reason, and stores that reason on the row. The same path stops the container and deletes the batches. The container logs hold the parse only. An embedding error is on the pipeline Worker.
+A step that fails after its retries sets the status to `failed`. The pipeline Worker logs `indexing_failed` with the original error, and the row stores the short reason. The container logs a parse failure before it returns the short reason. The same path stops the container and deletes the batches.
 
 ---
 

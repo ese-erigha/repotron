@@ -863,7 +863,7 @@ Each step does one side effect and retries on its own: 3 retries, exponential ba
 
 - **Mark failed.** Set `status = failed`, `failed_stage` = the status at that moment, and `failure_reason`.
   - A container error returns the reason in its JSON body.
-  - Any other error becomes "Indexing failed at the <stage> stage."
+  - Any other error keeps its message, with a token removed and the text cut at 200 characters. An empty message becomes "Indexing failed at the <stage> stage."
 - **Stop the container.**
 - **Delete the batches.**
 

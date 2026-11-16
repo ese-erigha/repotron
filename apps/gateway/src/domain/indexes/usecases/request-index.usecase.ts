@@ -7,6 +7,8 @@ import {
   type IndexView,
 } from 'repotron-domain'
 
+import { log } from 'log'
+
 import { getRepositories, getRepositoryIndexing } from '../../../context.ts'
 import { RequestError } from '../../../http-error.ts'
 import { consumeLimit, RATE_LIMIT_KIND } from '../consume-limit.ts'
@@ -87,6 +89,7 @@ async function startWorkflow(input: { repository: GithubRepository; commitSha: s
     })
   } catch (error) {
     if (isExistingInstance(error)) return
+    log.error('index_start_failed', input.indexId, error)
     await getRepositories().repositoryIndexes.markFailed({
       id: input.indexId,
       failedStage: INDEX_STATUS.queued,

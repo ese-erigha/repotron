@@ -5,6 +5,8 @@ import {
   type RepositoryLink,
 } from 'repotron-domain'
 
+import { log } from 'log'
+
 import { getConfig } from '../../context.ts'
 import { RequestError } from '../../http-error.ts'
 
@@ -62,8 +64,10 @@ async function githubJson(path: string): Promise<Record<string, unknown>> {
     },
   })
   if (response.status === 404) throw new RequestError(404, ERROR_CODE.repositoryNotFound, REPOSITORY_NOT_FOUND)
-  if (response.status === 403 || response.status === 429 || response.status >= 500) throw githubUnavailable()
-  if (!response.ok) throw githubUnavailable()
+  if (response.status === 403 || response.status === 429 || response.status >= 500 || !response.ok) {
+    log.error('github_failed', path, response.status)
+    throw githubUnavailable()
+  }
   const body: unknown = await response.json()
   if (!isRecord(body)) throw githubUnavailable()
   return body
