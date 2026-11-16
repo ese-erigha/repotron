@@ -25,9 +25,9 @@ export type VectorIndex = {
 export type AiBinding = {
   run(
     model: string,
-    input: { text: string[] },
+    input: { input: string[] },
     options: { gateway: { id: string } },
-  ): Promise<{ data?: number[][] }>
+  ): Promise<{ data?: { embedding?: number[] }[] }>
 }
 
 type RateLimiterStub = { consume(kind: RateLimitKind): Promise<RateLimitDecision> }

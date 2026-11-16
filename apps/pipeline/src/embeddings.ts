@@ -15,10 +15,13 @@ export async function embedTexts(texts: string[]): Promise<number[][]> {
 async function embedBatch(texts: string[]): Promise<number[][]> {
   const result = await getAi().run(
     EMBEDDING_MODEL_ID,
-    { text: texts },
+    { input: texts },
     { gateway: { id: getPipelineConfig().AI_GATEWAY_ID } },
   )
   const rows = result.data ?? []
   if (rows.length !== texts.length) throw new Error('The embedding response has the wrong size.')
-  return rows
+  return rows.map((row) => {
+    if (!row.embedding) throw new Error('An embedding is missing.')
+    return row.embedding
+  })
 }

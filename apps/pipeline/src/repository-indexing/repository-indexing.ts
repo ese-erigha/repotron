@@ -1,4 +1,5 @@
 import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from 'cloudflare:workers'
+import { log } from 'log'
 import { INDEX_STATUS, type IndexStatus } from 'repotron-domain'
 
 import { pipelineContext, pipelineStorage } from '../context.ts'
@@ -83,7 +84,12 @@ async function failIndexing(
   reason: string,
   batchKeys: string[],
 ): Promise<void> {
-  await step.do('mark failed', STEP, () => pipelineStorage.run(context, () => markFailed(indexId, stage, reason)))
+  await step.do('mark failed', STEP, () =>
+    pipelineStorage.run(context, async () => {
+      log.error('indexing_failed', indexId, stage, reason)
+      await markFailed(indexId, stage, reason)
+    }),
+  )
   await step.do('stop the container after failure', STEP, () =>
     pipelineStorage.run(context, () => stopContainer(indexId)),
   )

@@ -27,9 +27,9 @@ export type BatchBucket = {
 export type AiBinding = {
   run(
     model: string,
-    input: { text: string[] },
+    input: { input: string[] },
     options: { gateway: { id: string } },
-  ): Promise<{ data?: number[][] }>
+  ): Promise<{ data?: { embedding?: number[] }[] }>
 }
 
 export type WorkflowStart = { id: string; params: { indexId: string } }

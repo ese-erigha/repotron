@@ -57,7 +57,75 @@ Shared stores
 
 ---
 
-## 3. Components
+## 3. Index phases
+
+One index is one public repository at one commit. The gateway starts the job and returns. The pipeline Worker runs the job. The container parses the files, then the pipeline Worker stops it.
+
+The browser polls `GET /api/v1/indexes/:id` every 2 seconds. Each phase below writes the status on the `repository_indexes` row.
+
+### 1. Check the request — gateway
+
+- The browser posts the link and the Turnstile token to `POST /api/v1/indexes`.
+- The gateway checks the Turnstile token.
+- The gateway consumes one index unit for the hour. A refusal returns `429`.
+- The gateway parses the link. A link that is not a public GitHub repository returns `400`.
+
+### 2. Read the repository — gateway
+
+The gateway calls the GitHub API. It does not download the files.
+
+- `GET /repos/{owner}/{repo}` reads the id, the default branch, the privacy flag, and the size.
+- A missing repository and a private repository both return `404` from GitHub. The gateway returns one error for both.
+- A repository over the size limit returns `400`.
+- `GET /repos/{owner}/{repo}/branches/{default_branch}` reads the head commit sha.
+- `GET /repos/{owner}/{repo}/git/trees/{sha}?recursive=1` counts the files. A count over the file limit returns `400`.
+- When a row already exists for that repository and that commit, the gateway returns it.
+  - A `failed` row returns to `queued`, and the gateway restarts that Workflow.
+- Otherwise the gateway inserts a `queued` row and creates the `RepositoryIndexing` instance. The id is `<repositoryId>-<commitSha>`.
+- The gateway returns `201` for a new index and `200` for an existing one. The browser opens the status screen.
+
+### 3. Parse the files — container
+
+The pipeline Worker sets the status to `parsing`, then calls `POST /index` on the container. The container does this work:
+
+- Download `GET /repos/{owner}/{repo}/tarball/{sha}` and extract it. The tarball is that commit. The container runs no git command.
+- Walk the files. Skip vendored folders, lock files, minified files, binary files, and files over 1 MB.
+- Split each code file with Tree-sitter. A function, a method, or a class stays in one chunk. A README splits at its headings.
+- Write the chunks to R2 as JSONL, 500 chunks in each object, under `indexes/<indexId>/batch-<n>.jsonl`.
+- Return the file count, the chunk count, and the batch keys.
+
+The pipeline Worker then stops the container. The later phases read R2. They do not call the container.
+
+### 4. Store and embed — pipeline Worker
+
+The pipeline Worker sets the status to `embedding` and stores the file count. For each batch it runs one Workflow step:
+
+- Read the JSONL object from R2.
+- Insert the chunk rows into D1. One statement inserts one chunk.
+- Call Workers AI `@cf/google/embeddinggemma-2` with `{ input }` for that batch. Each string is `title: <header> | text: <content>`.
+- Upsert the vectors into Vectorize. The namespace is the index id.
+
+### 5. Wait for the vectors — pipeline Worker
+
+Vectorize applies an upsert after the call returns. The pipeline Worker calls `describe()` and compares `processedUpToDatetime` with the time of the last upsert. The step retries every 5 seconds until Vectorize has caught up.
+
+### 6. Finish — pipeline Worker
+
+- Set the status to `ready`, and store the chunk count and `ready_at`.
+- Delete the batch objects in R2.
+- Start one `IndexDeletion` for each earlier index of the same repository.
+  - That Workflow sets the old index to `deleting`, deletes its vectors and its chunk rows, then deletes the index row.
+  - The `answered_questions` rows stay, so a share link still opens.
+
+The browser reads `ready` on its next poll and opens the ask screen.
+
+### Failure — pipeline Worker
+
+A step that fails after its retries sets the status to `failed`. The pipeline Worker logs `indexing_failed` with the index id, the stage, and the reason, and stores that reason on the row. The same path stops the container and deletes the batches. The container logs hold the parse only. An embedding error is on the pipeline Worker.
+
+---
+
+## 4. Components
 
 ### Tier 1: Web app (`apps/web`)
 
@@ -100,7 +168,7 @@ Hono. One controller for each route group. One use case for each action.
 
 **Status.** `GET /api/v1/indexes/:id` also returns `fallbackIndexId`: the newest `ready` index of the same repository, while this index is not `ready`. The ask screen uses it during a re-index.
 
-**Question.** Refer to section 4, Scenario B.
+**Question.** Refer to section 5, Scenario B.
 
 ### Tier 3: Private Worker (`apps/pipeline`)
 
@@ -224,7 +292,7 @@ Python 3.12, managed with uv. CI runs it against the staging gateway. Phase 2 de
 
 ---
 
-## 4. Request lifecycles
+## 5. Request lifecycles
 
 ### Scenario A: The user indexes a repository
 
@@ -297,7 +365,7 @@ The trace calls no model, so it costs no tokens.
 
 ---
 
-## 5. Security
+## 6. Security
 
 - **Repository text is data.** The prompt wraps each chunk in tags after the rules. The answer contract tells the model to ignore an instruction inside a chunk. A unit test checks it in Phase 1. A golden case tests it from Phase 2.
 - **No code runs.** The indexer parses files. It does not run a build, a script, or a package install.
@@ -309,7 +377,7 @@ The trace calls no model, so it costs no tokens.
 
 ---
 
-## 6. Deployment
+## 7. Deployment
 
 One environment: staging. Each resource name is `repotron-staging-<role>`, such as `repotron-staging-db`.
 
@@ -337,7 +405,7 @@ One environment: staging. Each resource name is `repotron-staging-<role>`, such 
 
 ---
 
-## 7. Repository layout
+## 8. Repository layout
 
 [phase-1-plan.md](phase-1-plan.md), section 4, holds the full Phase 1 tree.
 
