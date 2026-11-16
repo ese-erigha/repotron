@@ -61,10 +61,10 @@ Shared stores
 
 ### Tier 1: Web app (`apps/web`)
 
-React and Vite. The Worker `repotron-staging-web` serves the Vite client build as static assets, and it answers `/api/v1` from the files in `apps/web/fixtures`. The browser calls that same origin. The Worker has no binding and no secret.
+React and Vite. The Worker `repotron-staging-web` serves the Vite client build as static assets. This is the current Cloudflare guidance: use Workers with static assets, not Pages. The Worker has no `entrypoint`, so no request runs code. The browser calls the gateway over HTTPS.
 
 - `notFoundHandling` is `single-page-application`, so a reload of a screen route returns the app.
-- `apps/web/src/config/public-config.ts` holds `API_ORIGIN` and the Turnstile site key. `API_ORIGIN` is empty, so the browser calls this Worker. Both values are public.
+- `apps/web/src/config/public-config.ts` holds `API_ORIGIN`, the gateway URL, and the Turnstile site key. Both values are public.
 - `/` holds the link box, Turnstile, and the recent list.
 - `/r/:owner/:repo?index=<indexId>` shows the status, then the ask screen. A reload reads the status by id, so it needs no new Turnstile token.
 - `/a/:id` shows one shared answer.
@@ -72,7 +72,7 @@ React and Vite. The Worker `repotron-staging-web` serves the Vite client build a
 
 The ask screen reads the answer stream with `fetch` and a stream reader. The citation panel renders the `retrieval` event before the first token.
 
-**Local run.** `pnpm --filter web dev` serves the app at `http://localhost:5173`. The Vite dev server answers `/api/v1` from `apps/web/fixtures`, so the app needs no gateway and no Cloudflare resource. The deployed Worker serves those same files. [phase-1-ui-plan.md](phase-1-ui-plan.md), section 12, lists the fixture repositories and the links that show each state.
+**Local run.** `pnpm --filter web dev` serves the app at `http://localhost:5173`. The Vite dev server answers `/api/v1` from `apps/web/fixtures`, so the app needs no gateway and no Cloudflare resource. The deployed build calls the gateway. [phase-1-ui-plan.md](phase-1-ui-plan.md), section 12, lists the fixture repositories and the links that show each state.
 
 ### Tier 2: Public API Worker (`apps/gateway`)
 

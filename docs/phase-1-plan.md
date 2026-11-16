@@ -584,11 +584,11 @@ Run these steps on staging:
 
 ### `repotron-staging-web`
 
-- **Entrypoint:** `fixtures/fixture-worker.ts`. It answers `/api/v1` from the fixture files. Every other path stays with the asset Worker.
+- **Entrypoint:** none. The config omits `entrypoint`, so the Worker is assets-only. The assets are the Vite client build.
 - **Bindings:** none
-- **Assets:** `notFoundHandling: "single-page-application"`, and `runWorkerFirst` is `/api/v1/*`
-- **Vars and secrets:** none. `API_ORIGIN` is empty. The Turnstile site key is the Cloudflare test key. Both live in `apps/web/src/config/public-config.ts`.
-- **Settings:** `workers.dev` on. `nodejs_compat` is on, because the fixture routes use `node:timers/promises`.
+- **Assets:** `notFoundHandling: "single-page-application"`
+- **Vars and secrets:** none. `API_ORIGIN` and the Turnstile site key are public, so they live in `apps/web/src/config/public-config.ts`.
+- **Settings:** `workers.dev` on.
 
 ```ts
 import { defineConfig } from 'cf/config'
@@ -596,14 +596,9 @@ import { defineConfig } from 'cf/config'
 export default defineConfig({
   worker: {
     name: 'repotron-staging-web',
-    entrypoint: './fixtures/fixture-worker.ts',
     compatibilityDate: '2026-11-11',
-    compatibilityFlags: ['nodejs_compat'],
+    assets: { notFoundHandling: 'single-page-application' },
     workersDev: true,
-    assets: {
-      notFoundHandling: 'single-page-application',
-      runWorkerFirst: ['/api/v1/*'],
-    },
   },
 })
 ```
@@ -992,7 +987,7 @@ detect-changes → test → migrate (when SQL changed)
 
 - **Trigger.** A push to `develop` that changes `apps/web`, `packages/domain`, or the lockfile. Also `workflow_dispatch`.
 - **test.** `pnpm turbo run lint typecheck test build --filter=web...`. This covers the web app and `packages/domain`. It does not run the gateway, the pipeline, or the indexer.
-- **deploy.** `cf deploy` in `apps/web`. The Worker serves the screens and the fixture API.
+- **deploy.** `cf deploy` in `apps/web`. The Worker serves the screens. The browser calls the gateway.
 
 Phase 2 adds the eval job.
 

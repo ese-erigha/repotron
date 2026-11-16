@@ -6,7 +6,7 @@ import { defineConfig } from 'vite'
 import { fixtureApi } from './fixtures/fixture-api.ts'
 
 // The dev server answers the API from fixtures, so it needs no gateway.
-// The build makes the assets of the Worker. The Worker entry serves the same fixture API.
+// The build makes the assets of the Worker. The browser calls the gateway.
 export default defineConfig(({ command }) => ({
   plugins: [react(), tailwindcss(), command === 'serve' ? fixtureApi() : cloudflare()],
   server: {

@@ -1,7 +1,11 @@
-/** The test key of Cloudflare. It passes on every host, including the deployed site. */
+const GATEWAY_ORIGIN = 'https://repotron-staging-gateway.ese-erigha.workers.dev'
+
+const STAGING_TURNSTILE_SITE_KEY = '0x4AAAAAAGBXtBG9qrWYoImQ'
+
+/** The test key of Cloudflare. It passes on every host, so the widget works on localhost. */
 const TEST_TURNSTILE_SITE_KEY = '1x00000000000000000000AA'
 
-/** The web Worker answers `/api/v1` from the fixture files on its own origin. */
-export const API_ORIGIN = ''
+/** The dev server answers the API from fixtures on its own origin. */
+export const API_ORIGIN = import.meta.env.DEV ? '' : GATEWAY_ORIGIN
 
-export const TURNSTILE_SITE_KEY = TEST_TURNSTILE_SITE_KEY
+export const TURNSTILE_SITE_KEY = import.meta.env.DEV ? TEST_TURNSTILE_SITE_KEY : STAGING_TURNSTILE_SITE_KEY

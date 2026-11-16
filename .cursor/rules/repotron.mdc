@@ -9,7 +9,7 @@ Repotron answers questions about a public GitHub repository, with a citation for
 
 **Runtimes**
 
-- `apps/web` — React + Vite. `repotron-staging-web` serves the screens and answers `/api/v1` from `fixtures/`. It has no secret and no binding.
+- `apps/web` — React + Vite. An assets-only Worker with no entrypoint and no binding. The browser calls the gateway over HTTPS with CORS.
 - `apps/gateway` — Hono. The public API Worker. `cloudflare.config.ts` is the Worker config.
 - `apps/pipeline` — private Worker. The Workflows, the `Indexer` Container class, and the cron.
 - `apps/indexer` — Python 3.12, uv, and FastAPI, in a Cloudflare Container. Only the pipeline calls it.

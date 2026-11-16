@@ -804,7 +804,7 @@ Vite dev server ── fixtureApi plugin ──► fixture-routes ──► Fixt
 
 - **What is real.** The app code is the production code: `http-client.ts`, the error envelope, the `Retry-After` header, the stream parser, the polling, and the Turnstile widget with the test key of Cloudflare.
 - **What is fixed.** The answers, the index progress, and the errors.
-- **The deployed site serves the fixture files.** `API_ORIGIN` is empty, so the browser calls `/api/v1` on the web Worker. The dev server uses the Vite plugin. The deploy uses `fixtures/fixture-worker.ts` for those same routes.
+- **The build holds no fixture code.** `vite.config.ts` adds `fixtureApi()` only for the dev server. The build adds the Cloudflare plugin, and `API_ORIGIN` is the gateway URL.
 - **The data lives in memory.** A restart of the dev server, or a change to a fixture file, clears each index and each answer that the session made.
 
 ### 12.1 Repositories
