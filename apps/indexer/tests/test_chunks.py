@@ -34,6 +34,15 @@ def test_when_a_python_file_has_two_functions_then_each_function_keeps_its_line_
     _validate(chunks)
 
 
+def test_when_a_module_region_exceeds_the_token_limit_then_it_splits_into_parts() -> None:
+    source = ("word " * 20 + "\n") * 200
+    chunks = chunk_code("notes.py", source, "python")
+    assert len(chunks) == 3
+    assert [chunk["kind"] for chunk in chunks] == ["module", "module", "module"]
+    assert "".join(str(chunk["content"]) for chunk in chunks) == source.strip("\n")
+    _validate(chunks)
+
+
 def test_when_a_class_is_large_then_it_splits_at_its_methods_and_keeps_its_header() -> None:
     methods = "\n".join(
         f"    def method_{number}(self):\n        return {number}\n" for number in range(200)

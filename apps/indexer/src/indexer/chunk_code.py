@@ -119,20 +119,26 @@ def _module_region(
     if content.strip() == "":
         return []
     start_line = source[:start].count(b"\n") + 1
-    end_line = start_line + content.count("\n")
-    return [
-        {
-            "path": path,
-            "language": language,
-            "symbol": None,
-            "kind": "module",
-            "startLine": start_line,
-            "endLine": max(end_line, start_line),
-            "content": content.strip("\n"),
-            "header": path,
-            "identifiers": "",
-        }
-    ]
+    end_line = max(start_line + content.count("\n"), start_line)
+    text = content.strip("\n")
+    parts = [text] if _token_count(text) <= MAX_CHUNK_TOKENS else _token_parts(text)
+    return [_module_chunk(path, language, part, start_line, end_line) for part in parts]
+
+
+def _module_chunk(
+    path: str, language: str, content: str, start_line: int, end_line: int
+) -> dict[str, object]:
+    return {
+        "path": path,
+        "language": language,
+        "symbol": None,
+        "kind": "module",
+        "startLine": start_line,
+        "endLine": end_line,
+        "content": content,
+        "header": path,
+        "identifiers": "",
+    }
 
 
 def _split_oversized(
