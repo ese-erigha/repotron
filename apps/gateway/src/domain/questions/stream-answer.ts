@@ -82,6 +82,7 @@ async function readModelStream(
     method: 'POST',
     headers: {
       Authorization: `Bearer ${getConfig().OPENROUTER_API_KEY}`,
+      'cf-aig-authorization': `Bearer ${getConfig().CF_AIG_TOKEN}`,
       'content-type': 'application/json',
     },
     body: JSON.stringify({

@@ -15,6 +15,7 @@ const config = {
   TURNSTILE_SECRET: 'turnstile',
   GITHUB_TOKEN: 'github',
   OPENROUTER_API_KEY: 'openrouter',
+  CF_AIG_TOKEN: 'gateway-token',
 } satisfies GatewayEnv
 
 describe('requestIndex', () => {

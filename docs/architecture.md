@@ -375,7 +375,7 @@ The trace calls no model, so it costs no tokens.
 - **Abuse.** Turnstile and the `RateLimiter` Durable Object guard the gateway. The size limits guard the container.
 - **CORS.** The gateway allows only the web origin. CORS does not stop a script outside a browser, so Turnstile and the rate limits stay the real guard.
 - **Index scope.** The index id comes from the route. Each Vectorize query sets the namespace. Each D1 chunk query filters on the index id. Each FTS5 query starts with the index id.
-- **Secrets.** `TURNSTILE_SECRET`, `GITHUB_TOKEN`, and `OPENROUTER_API_KEY` are gateway secrets. `GITHUB_TOKEN`, `R2_ACCESS_KEY_ID`, and `R2_SECRET_ACCESS_KEY` are pipeline secrets. The pipeline passes its three secrets to the container as environment variables. The web Worker has no secret.
+- **Secrets.** `TURNSTILE_SECRET`, `GITHUB_TOKEN`, `OPENROUTER_API_KEY`, and `CF_AIG_TOKEN` are gateway secrets. The answer request sends `CF_AIG_TOKEN` in `cf-aig-authorization`. `GITHUB_TOKEN`, `R2_ACCESS_KEY_ID`, and `R2_SECRET_ACCESS_KEY` are pipeline secrets. The pipeline passes its three secrets to the container as environment variables. The web Worker has no secret.
 
 ---
 

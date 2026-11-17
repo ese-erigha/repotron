@@ -330,7 +330,7 @@ Every name uses `repotron-staging-<role>`.
 - **Cloudflare, created by CI** (`scripts/ensure-resources-staging.sh`). Each binding names these resources, so CI can create them before the deploy.
   - R2 bucket `repotron-staging-batches`
   - Vectorize index `repotron-staging-chunks`: 768 dimensions, `cosine`, and string metadata indexes on `path`, `language`, and `kind`
-  - AI Gateway `repotron-staging-ai-gateway`, with authentication off and logs on
+  - AI Gateway `repotron-staging-ai-gateway`, with authentication on and logs on
 - **Cloudflare, created once by hand.** Each one gives a value that goes into the code or into a secret.
   - The CI API token
   - D1 database `repotron-staging-db`. Its id goes into 2 configs.
@@ -481,7 +481,7 @@ Each create command passed a `--dry-run`. Each `get` returns `404 Not Found` for
   - A request from `APP_ORIGIN` gets the CORS headers, and a request from another origin gets none.
   - A preflight `OPTIONS` returns `204`.
   - `RateLimiter` refuses the sixth index request in one hour and returns the seconds until the next hour.
-- **You, after the merge:** Set the 3 gateway secrets with the same command: `TURNSTILE_SECRET`, `GITHUB_TOKEN`, and `OPENROUTER_API_KEY`. The web Worker has no secret.
+- **You, after the merge:** Set the 4 gateway secrets with the same command: `TURNSTILE_SECRET`, `GITHUB_TOKEN`, `OPENROUTER_API_KEY`, and `CF_AIG_TOKEN`. The web Worker has no secret.
 - **Staging check**
   - `<gateway URL>/api/v1/unknown` returns the `404` envelope.
   - `<web URL>/r/a/b` returns the app, not a `404`.
@@ -613,7 +613,7 @@ export default defineConfig({
   - `REPOSITORY_INDEXING` — Workflow `repotron-staging-repository-indexing`, worker `repotron-staging-pipeline`, export `RepositoryIndexing`
   - `RATE_LIMITER` — Durable Object `RateLimiter`, SQLite storage
 - **Vars:** `APP_ORIGIN` (the web URL, for CORS), `CLOUDFLARE_ACCOUNT_ID`, `AI_GATEWAY_ID` (`repotron-staging-ai-gateway`), and `ANSWER_MODEL_ID` (`anthropic/claude-haiku-5.5`)
-- **Secrets:** `TURNSTILE_SECRET`, `GITHUB_TOKEN`, and `OPENROUTER_API_KEY`
+- **Secrets:** `TURNSTILE_SECRET`, `GITHUB_TOKEN`, `OPENROUTER_API_KEY`, and `CF_AIG_TOKEN`
 - **Settings:** observability on. `workers.dev` on. This URL is the public API.
 
 ### `repotron-staging-pipeline`
@@ -1036,7 +1036,7 @@ These rules hold in every stage. A change that breaks one is a defect.
 - **Private and missing repositories.** GitHub returns `404` for both, so US-1.1 shows one message for both cases.
 - **One user behind a shared IP address.** The hourly limits count by IP address, so users on one network share 5 index requests and 30 questions.
 - **Origin values.** `API_ORIGIN` and `APP_ORIGIN` hold the `workers.dev` URLs. A custom domain later changes both values in one pull request. A wrong `APP_ORIGIN` blocks every browser call. The CORS unit test and the staging check of stage 8 catch it.
-- **Unauthenticated AI Gateway.** Anyone with the gateway URL can send traffic to it. Each call still needs the OpenRouter key or Workers AI billing on this account. Turn on authentication before a public launch.
+- **Authenticated AI Gateway.** A new gateway requires authentication, and it cannot be turned off. The answer request sends `CF_AIG_TOKEN` in `cf-aig-authorization`. The OpenRouter key stays in `Authorization`.
 - **`MAX_CHUNK_TOKENS`.** The value 1,500 is a starting guess. Phase 2 tunes it with the eval.
 - **D1 size.** One database stops at 10 GB. The 30-day cleanup is the only control. Measure the size on staging.
 
@@ -1050,6 +1050,7 @@ Set each secret after the Worker exists.
   - `TURNSTILE_SECRET`
   - `GITHUB_TOKEN`
   - `OPENROUTER_API_KEY`
+  - `CF_AIG_TOKEN`
 - **`repotron-staging-pipeline`**
   - `GITHUB_TOKEN`
   - `R2_ACCESS_KEY_ID`

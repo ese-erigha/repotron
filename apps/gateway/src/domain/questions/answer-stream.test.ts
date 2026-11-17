@@ -16,6 +16,7 @@ const config = {
   TURNSTILE_SECRET: 'turnstile',
   GITHUB_TOKEN: 'github',
   OPENROUTER_API_KEY: 'openrouter',
+  CF_AIG_TOKEN: 'gateway-token',
 } satisfies GatewayEnv
 
 const index = {
@@ -27,6 +28,26 @@ const index = {
 }
 
 describe('openAnswerStream', () => {
+  it('when the answer request is sent, then it authorizes the AI Gateway', async () => {
+    const pending: Promise<unknown>[] = []
+    const original = globalThis.fetch
+    let authorization = ''
+    globalThis.fetch = (async (_url, init) => {
+      const headers = new Headers(init?.headers)
+      authorization = headers.get('cf-aig-authorization') ?? ''
+      return new Response('data: [DONE]\n\n')
+    }) as typeof fetch
+    try {
+      await gatewayStorage.run(context([], pending), async () =>
+        readEvents(openAnswerStream({ index, question: 'Where?', preset: null, chunks: [chunk()], paths: [], startedAt: 1 })),
+      )
+      await Promise.all(pending)
+      assert.equal(authorization, 'Bearer gateway-token')
+    } finally {
+      globalThis.fetch = original
+    }
+  })
+
   it('when the model fails, then the stream sends error and writes no question', async () => {
     const saved: string[] = []
     const pending: Promise<unknown>[] = []
