@@ -6,7 +6,7 @@ import { embedTexts } from '../embeddings.ts'
 
 export async function storeBatch(indexId: string, key: string): Promise<string> {
   const object = await getBatches().get(key)
-  if (!object) throw new Error('A chunk batch is missing.')
+  if (!object) throw new Error(`A chunk batch is missing. Key ${key}.`)
   const chunks = parseBatch(await object.text())
   const rows = chunks.map((chunk) => toChunkRow(indexId, chunk))
   await getRepositories().sourceChunks.insertBatch(rows)
@@ -42,7 +42,7 @@ function toChunkRow(indexId: string, chunk: ReturnType<typeof chunkSchema.parse>
 }
 
 function toVector(indexId: string, chunk: ReturnType<typeof chunkSchema.parse>, values: number[] | undefined) {
-  if (!values) throw new Error('An embedding is missing.')
+  if (!values) throw new Error(`An embedding is missing. Chunk ${chunk.id}.`)
   return {
     id: chunk.id,
     values,

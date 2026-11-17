@@ -11,11 +11,24 @@ import { storeBatch } from './repository-indexing/store-batch.ts'
 import { assertVectorsReady } from './repository-indexing/wait-for-vectors.ts'
 
 describe('assertVectorsReady', () => {
-  it('when the vectors were processed before the last upsert, then the wait throws', async () => {
+  it('when the vectors were processed before the last upsert, then the error names both times', async () => {
     const context = vectorsContext('2026-01-01T00:00:00.000Z')
     await assert.rejects(
       () => pipelineStorage.run(context, () => assertVectorsReady('2026-01-01T00:00:05.000Z')),
-      /not ready/,
+      (error: unknown) => {
+        assert.ok(error instanceof Error)
+        assert.match(error.message, /2026-01-01T00:00:00.000Z/)
+        assert.match(error.message, /2026-01-01T00:00:05.000Z/)
+        return true
+      },
+    )
+  })
+
+  it('when Vectorize returns no processed time, then the error says the time is missing', async () => {
+    const context = { vectors: { describe: async () => ({}) } } as unknown as PipelineContext
+    await assert.rejects(
+      () => pipelineStorage.run(context, () => assertVectorsReady('2026-01-01T00:00:05.000Z')),
+      /missing/,
     )
   })
 

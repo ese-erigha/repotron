@@ -95,7 +95,11 @@ async function readModelStream(
       reasoning: { effort: 'none' },
     }),
   })
-  if (!response.ok || !response.body) throw new Error('The answer model failed.')
+  if (!response.ok) {
+    const detail = await response.text()
+    throw new Error(`The answer model failed with status ${response.status}. ${detail}`)
+  }
+  if (!response.body) throw new Error('The answer model returned an empty body.')
   return readSse(send, response.body)
 }
 

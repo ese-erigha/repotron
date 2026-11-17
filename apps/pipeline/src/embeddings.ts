@@ -19,9 +19,11 @@ async function embedBatch(texts: string[]): Promise<number[][]> {
     { gateway: { id: getPipelineConfig().AI_GATEWAY_ID } },
   )
   const rows = result.data ?? []
-  if (rows.length !== texts.length) throw new Error('The embedding response has the wrong size.')
-  return rows.map((row) => {
-    if (!row.embedding) throw new Error('An embedding is missing.')
+  if (rows.length !== texts.length) {
+    throw new Error(`The embedding response has the wrong size. Expected ${texts.length} and received ${rows.length}.`)
+  }
+  return rows.map((row, index) => {
+    if (!row.embedding) throw new Error(`An embedding is missing. Row ${index} of ${texts.length}.`)
     return row.embedding
   })
 }

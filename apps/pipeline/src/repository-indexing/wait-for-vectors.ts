@@ -2,8 +2,12 @@ import { getVectors } from '../context.ts'
 
 export async function assertVectorsReady(lastUpsertAt: string): Promise<void> {
   const described = await getVectors().describe()
-  if (toMillis(described.processedUpToDatetime) < Date.parse(lastUpsertAt)) {
-    throw new Error('The vectors are not ready.')
+  const processedUpTo = described.processedUpToDatetime
+  if (toMillis(processedUpTo) < Date.parse(lastUpsertAt)) {
+    const processedText = typeof processedUpTo === 'string' || typeof processedUpTo === 'number' ? String(processedUpTo) : 'missing'
+    throw new Error(
+      `The vectors are not ready. Vectorize processed up to ${processedText}. The last upsert was at ${lastUpsertAt}.`,
+    )
   }
 }
 

@@ -87,7 +87,7 @@ async function failIndexing(
   const reason = failureReason(error, stage)
   await step.do('mark failed', STEP, () =>
     pipelineStorage.run(context, async () => {
-      log.error('indexing_failed', indexId, stage, error)
+      log.error('indexing_failed', indexId, stage, reason)
       await markFailed(indexId, stage, reason)
     }),
   )

@@ -1,3 +1,4 @@
+import { log } from 'log'
 import { INDEX_RETENTION_DAYS } from 'repotron-domain'
 
 import type { WorkflowStart } from '../bindings.ts'
@@ -17,8 +18,12 @@ export async function startDeletions(indexIds: string[]): Promise<void> {
   try {
     await getIndexDeletion().createBatch(batch)
   } catch (error) {
-    if (!isExistingInstance(error)) throw error
-    await startDeletionsOneByOne(batch)
+    if (isExistingInstance(error)) {
+      await startDeletionsOneByOne(batch)
+      return
+    }
+    log.error('deletion_start_failed', error)
+    throw error
   }
 }
 
@@ -27,7 +32,9 @@ async function startDeletionsOneByOne(batch: WorkflowStart[]): Promise<void> {
     try {
       await getIndexDeletion().create(instance)
     } catch (error) {
-      if (!isExistingInstance(error)) throw error
+      if (isExistingInstance(error)) continue
+      log.error('deletion_start_failed', instance.id, error)
+      throw error
     }
   }
 }

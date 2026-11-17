@@ -1,8 +1,11 @@
 import io
+import logging
 import tarfile
 from pathlib import Path
 
 import httpx
+
+logger = logging.getLogger(__name__)
 
 
 class TarballError(Exception):
@@ -21,8 +24,14 @@ def fetch_tarball(owner: str, name: str, commit_sha: str, token: str, destinatio
     }
     with httpx.stream("GET", url, headers=headers, follow_redirects=True, timeout=120) as response:
         if response.status_code == 404:
+            logger.error(
+                "tarball_failed status=%s owner=%s name=%s", response.status_code, owner, name
+            )
             raise TarballError("The repository download was not found.")
         if response.status_code >= 400:
+            logger.error(
+                "tarball_failed status=%s owner=%s name=%s", response.status_code, owner, name
+            )
             raise TarballError("The repository download failed.")
         payload = b"".join(response.iter_bytes())
     extract_tarball(payload, destination)
@@ -41,6 +50,7 @@ def _extract_member(archive: tarfile.TarFile, member: tarfile.TarInfo, root: Pat
         return
     target = (root / member.name).resolve()
     if not target.is_relative_to(root):
+        logger.error("tarball_failed unsafe_path=%s", member.name)
         raise TarballError("The repository archive contains an unsafe path.")
     if member.isdir():
         target.mkdir(parents=True, exist_ok=True)

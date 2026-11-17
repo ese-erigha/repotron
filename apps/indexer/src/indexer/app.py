@@ -29,9 +29,10 @@ def read_index(body: IndexRequest) -> JSONResponse:
     try:
         result = index_repository(body.indexId, body.owner, body.name, body.commitSha)
     except TarballError as error:
-        logger.exception("tarball_failed index=%s", body.indexId)
+        logger.exception("tarball_failed index=%s error=%s", body.indexId, error.reason)
         return JSONResponse(status_code=400, content={"reason": error.reason})
-    except Exception:
-        logger.exception("parse_failed index=%s", body.indexId)
+    except Exception as error:
+        message = str(error)
+        logger.exception("parse_failed index=%s error=%s", body.indexId, message)
         return JSONResponse(status_code=500, content={"reason": "Indexing failed."})
     return JSONResponse(status_code=200, content=result)

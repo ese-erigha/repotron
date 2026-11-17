@@ -32,14 +32,20 @@ export async function readGithubRepository(link: RepositoryLink): Promise<Github
   const owner = nestedString(body, 'owner', 'login') ?? link.owner
   const name = stringField(body, 'name') ?? link.name
   const defaultBranch = stringField(body, 'default_branch')
-  if (typeof id !== 'number' || !defaultBranch) throw githubUnavailable()
+  if (typeof id !== 'number' || !defaultBranch) {
+    log.error('github_failed', `/repos/${link.owner}/${link.name}`, 'The id or the default branch is missing.')
+    throw githubUnavailable()
+  }
   return { id: String(id), owner, name, defaultBranch, sizeKilobytes: size, private: false }
 }
 
 export async function readHeadCommit(link: RepositoryLink, branch: string): Promise<string> {
   const body = await githubJson(`/repos/${link.owner}/${link.name}/branches/${branch}`)
   const sha = nestedString(body, 'commit', 'sha')
-  if (!sha) throw githubUnavailable()
+  if (!sha) {
+    log.error('github_failed', `/repos/${link.owner}/${link.name}/branches/${branch}`, 'The commit sha is missing.')
+    throw githubUnavailable()
+  }
   return sha
 }
 
@@ -65,11 +71,15 @@ async function githubJson(path: string): Promise<Record<string, unknown>> {
   })
   if (response.status === 404) throw new RequestError(404, ERROR_CODE.repositoryNotFound, REPOSITORY_NOT_FOUND)
   if (response.status === 403 || response.status === 429 || response.status >= 500 || !response.ok) {
-    log.error('github_failed', path, response.status)
+    const detail = await response.text()
+    log.error('github_failed', path, response.status, detail)
     throw githubUnavailable()
   }
   const body: unknown = await response.json()
-  if (!isRecord(body)) throw githubUnavailable()
+  if (!isRecord(body)) {
+    log.error('github_failed', path, 'The body is not an object.')
+    throw githubUnavailable()
+  }
   return body
 }
 

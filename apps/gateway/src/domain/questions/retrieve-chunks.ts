@@ -10,7 +10,7 @@ export async function retrieveChunks(indexId: string, question: string): Promise
     { gateway: { id: getConfig().AI_GATEWAY_ID } },
   )
   const vector = embedded.data?.[0]?.embedding
-  if (!vector) throw new Error('The question embedding is missing.')
+  if (!vector) throw new Error(`The question embedding is missing. The model returned ${embedded.data?.length ?? 0} rows.`)
   const result = await getVectors().query(vector, {
     topK: CONTEXT_CHUNKS,
     namespace: indexId,
