@@ -12,7 +12,7 @@ This file lists each feature, its phase, and the check that proves it on staging
 
 ---
 
-## 2. Phase 1: Index and ask
+## 2. Phase 1: Index and ask (completed)
 
 - **F-1: Repository intake.** The user pastes a public GitHub link.
   - Turnstile, the rate limit, and the size limits run before any job starts.
@@ -34,6 +34,8 @@ This file lists each feature, its phase, and the check that proves it on staging
   - "Explain this feature" gives what it does, the flow, the key files, and the edge cases.
 
 ## 3. Phase 2: Eval gate
+
+[phase-2-plan.md](phase-2-plan.md) holds the delivery stages.
 
 - **F-9: Golden set.** 3 repositories at fixed commits, with 60 questions at least.
   - The question kinds are identifier, concept, architecture, start-here, feature, and out-of-repository.

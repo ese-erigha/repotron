@@ -149,7 +149,7 @@ app.post('/api/v1/indexes/:id/questions', ...)
 - **Straight-line calls** — one `await` per statement. Name the result, then pass that name.
 - **Product thresholds** such as `CONTEXT_CHUNKS` live in `packages/domain`. Do not hardcode a second copy.
 - **Log** — call `log` from the `log` package. It forwards the arguments to `console`. The `log` package is the only code that calls `console`.
-- **Env** — required secrets are validated at the boundary. No silent fallback for `GITHUB_TOKEN`, `TURNSTILE_SECRET`, `OPENROUTER_API_KEY`, or `CF_AIG_TOKEN`. Do not commit secrets. Logs omit tokens, authorization headers, and IP addresses.
+- **Env** — required secrets are validated at the boundary. No silent fallback for `GITHUB_TOKEN`, `TURNSTILE_SECRET`, `OPENROUTER_API_KEY`, `CF_AIG_TOKEN`, or `EVAL_TOKEN`. Do not commit secrets. Logs omit tokens, authorization headers, and IP addresses.
 
 ```typescript
 // ❌ BAD

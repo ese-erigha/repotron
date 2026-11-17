@@ -1,5 +1,7 @@
 # Phase 1 implementation plan: Index and ask
 
+**Status.** Completed on staging on November 16, 2026. A public repository indexes, and a question returns a cited answer. [phase-2-plan.md](phase-2-plan.md) holds the next work.
+
 This plan turns Phase 1 of [prd.md](prd.md) into work that one implementer can do in order. It names every resource, table, route, and rule. It contains no application code.
 
 **Read first, in this order:**
@@ -481,7 +483,7 @@ Each create command passed a `--dry-run`. Each `get` returns `404 Not Found` for
   - A request from `APP_ORIGIN` gets the CORS headers, and a request from another origin gets none.
   - A preflight `OPTIONS` returns `204`.
   - `RateLimiter` refuses the sixth index request in one hour and returns the seconds until the next hour.
-- **You, after the merge:** Set the 4 gateway secrets with the same command: `TURNSTILE_SECRET`, `GITHUB_TOKEN`, `OPENROUTER_API_KEY`, and `CF_AIG_TOKEN`. The web Worker has no secret.
+- **You, after the merge:** Set the gateway secrets with the same command: `TURNSTILE_SECRET`, `GITHUB_TOKEN`, `OPENROUTER_API_KEY`, `CF_AIG_TOKEN`, and `EVAL_TOKEN`. The web Worker has no secret.
 - **Staging check**
   - `<gateway URL>/api/v1/unknown` returns the `404` envelope.
   - `<web URL>/r/a/b` returns the app, not a `404`.
@@ -613,7 +615,7 @@ export default defineConfig({
   - `REPOSITORY_INDEXING` — Workflow `repotron-staging-repository-indexing`, worker `repotron-staging-pipeline`, export `RepositoryIndexing`
   - `RATE_LIMITER` — Durable Object `RateLimiter`, SQLite storage
 - **Vars:** `APP_ORIGIN` (the web URL, for CORS), `CLOUDFLARE_ACCOUNT_ID`, `AI_GATEWAY_ID` (`repotron-staging-ai-gateway`), and `ANSWER_MODEL_ID` (`anthropic/claude-haiku-5.5`)
-- **Secrets:** `TURNSTILE_SECRET`, `GITHUB_TOKEN`, `OPENROUTER_API_KEY`, and `CF_AIG_TOKEN`
+- **Secrets:** `TURNSTILE_SECRET`, `GITHUB_TOKEN`, `OPENROUTER_API_KEY`, `CF_AIG_TOKEN`, and `EVAL_TOKEN`
 - **Settings:** observability on. `workers.dev` on. This URL is the public API.
 
 ### `repotron-staging-pipeline`
@@ -1051,6 +1053,7 @@ Set each secret after the Worker exists.
   - `GITHUB_TOKEN`
   - `OPENROUTER_API_KEY`
   - `CF_AIG_TOKEN`
+  - `EVAL_TOKEN`
 - **`repotron-staging-pipeline`**
   - `GITHUB_TOKEN`
   - `R2_ACCESS_KEY_ID`

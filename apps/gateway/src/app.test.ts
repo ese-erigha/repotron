@@ -14,6 +14,7 @@ const env = {
   GITHUB_TOKEN: 'github',
   OPENROUTER_API_KEY: 'openrouter',
   CF_AIG_TOKEN: 'gateway-token',
+  EVAL_TOKEN: 'eval-token',
   DB: {},
 }
 

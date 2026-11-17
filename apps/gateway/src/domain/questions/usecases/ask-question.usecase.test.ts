@@ -1,0 +1,76 @@
+import assert from 'node:assert/strict'
+import { describe, it } from 'node:test'
+import { INDEX_STATUS } from 'repotron-domain'
+
+import { gatewayStorage, type GatewayContext } from '../../../context.ts'
+import type { GatewayEnv } from '../../../env.ts'
+import { RequestError } from '../../../http-error.ts'
+import { askQuestion } from './ask-question.usecase.ts'
+
+const config = {
+  APP_ORIGIN: 'https://repotron.example',
+  CLOUDFLARE_ACCOUNT_ID: 'account',
+  AI_GATEWAY_ID: 'gateway',
+  ANSWER_MODEL_ID: 'model',
+  TURNSTILE_SECRET: 'turnstile',
+  GITHUB_TOKEN: 'github',
+  OPENROUTER_API_KEY: 'openrouter',
+  CF_AIG_TOKEN: 'gateway-token',
+  EVAL_TOKEN: 'eval-token',
+} satisfies GatewayEnv
+
+const indexRow = {
+  id: '9-abc',
+  repositoryId: '9',
+  commitSha: 'abc',
+  status: INDEX_STATUS.ready,
+}
+
+describe('askQuestion', () => {
+  it('when the eval token matches, then the question does not call the rate limit', async () => {
+    const calls = { n: 0 }
+    const stream = await gatewayStorage.run(context({ calls, allowed: true }), () =>
+      askQuestion({ indexId: '9-abc', body: { question: 'Where?' }, remoteIp: '203.0.113.5', evalToken: 'eval-token' }),
+    )
+    await new Response(stream).text()
+    assert.equal(calls.n, 0)
+  })
+
+  it('when the eval token is absent and the question limit is full, then the question is refused', async () => {
+    const calls = { n: 0 }
+    await assert.rejects(
+      () =>
+        gatewayStorage.run(context({ calls, allowed: false }), () =>
+          askQuestion({ indexId: '9-abc', body: { question: 'Where?' }, remoteIp: '203.0.113.5', evalToken: '' }),
+        ),
+      (error: unknown) => error instanceof RequestError && error.status === 429,
+    )
+    assert.equal(calls.n, 1)
+  })
+})
+
+function context(input: { calls: { n: number }; allowed: boolean }): GatewayContext {
+  return {
+    config,
+    repositories: {
+      repositoryIndexes: {
+        get: async () => indexRow,
+        recordQuestion: async () => undefined,
+      },
+      githubRepositories: { get: async () => ({ id: '9', owner: 'owner', name: 'repo' }) },
+      sourceChunks: { listByIds: async () => [] },
+      answeredQuestions: { insert: async () => undefined },
+    },
+    vectors: { query: async () => ({ matches: [] }) },
+    ai: { run: async () => ({ data: [{ embedding: [0.1] }] }) },
+    rateLimiter: {
+      getByName: () => ({
+        consume: async () => {
+          input.calls.n += 1
+          return input.allowed ? { allowed: true } : { allowed: false, retryAfterSeconds: 60 }
+        },
+      }),
+    },
+    execution: { waitUntil() {} },
+  } as unknown as GatewayContext
+}

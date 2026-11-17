@@ -9,16 +9,16 @@ import {
 
 import type { QuestionBody } from '../questions.schema.ts'
 
-import { getRepositories } from '../../../context.ts'
+import { getConfig, getRepositories } from '../../../context.ts'
 import { RequestError } from '../../../http-error.ts'
 import { consumeLimit, RATE_LIMIT_KIND } from '../../indexes/consume-limit.ts'
 import { retrieveChunks } from '../retrieve-chunks.ts'
 import { openAnswerStream } from '../stream-answer.ts'
 
-export type AskQuestionInput = { indexId: string; body: QuestionBody; remoteIp: string }
+export type AskQuestionInput = { indexId: string; body: QuestionBody; remoteIp: string; evalToken: string }
 
 export async function askQuestion(input: AskQuestionInput): Promise<ReadableStream<Uint8Array>> {
-  await consumeLimit(RATE_LIMIT_KIND.question, input.remoteIp)
+  if (!isEvalToken(input.evalToken)) await consumeLimit(RATE_LIMIT_KIND.question, input.remoteIp)
   const row = await getRepositories().repositoryIndexes.get(input.indexId)
   if (!row) throw new RequestError(404, ERROR_CODE.notFound, 'The index does not exist.')
   if (row.status !== INDEX_STATUS.ready) {
@@ -47,6 +47,10 @@ export async function askQuestion(input: AskQuestionInput): Promise<ReadableStre
     paths,
     startedAt: Date.now(),
   })
+}
+
+function isEvalToken(token: string): boolean {
+  return token.length > 0 && token === getConfig().EVAL_TOKEN
 }
 
 function questionText(body: QuestionBody): string {

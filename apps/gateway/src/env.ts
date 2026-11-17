@@ -9,6 +9,7 @@ const gatewayEnvSchema = z.object({
   GITHUB_TOKEN: z.string().min(1),
   OPENROUTER_API_KEY: z.string().min(1),
   CF_AIG_TOKEN: z.string().min(1),
+  EVAL_TOKEN: z.string().min(1),
 })
 
 export type GatewayEnv = z.infer<typeof gatewayEnvSchema>
@@ -23,6 +24,7 @@ export function readGatewayEnv(source: Record<string, unknown>): GatewayEnv {
     GITHUB_TOKEN: source.GITHUB_TOKEN,
     OPENROUTER_API_KEY: source.OPENROUTER_API_KEY,
     CF_AIG_TOKEN: source.CF_AIG_TOKEN,
+    EVAL_TOKEN: source.EVAL_TOKEN,
   }
   return gatewayEnvSchema.parse(env)
 }

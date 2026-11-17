@@ -8,6 +8,8 @@ import { requestIndex } from './usecases/request-index.usecase.ts'
 import { questionBodySchema } from '../questions/questions.schema.ts'
 import { askQuestion } from '../questions/usecases/ask-question.usecase.ts'
 
+const EVAL_TOKEN_HEADER = 'x-repotron-eval-token'
+
 const indexes = new Hono()
 
 indexes.post('/', async (c) => {
@@ -36,6 +38,7 @@ indexes.post('/:id/questions', async (c) => {
     indexId: c.req.param('id'),
     body,
     remoteIp: c.req.header('CF-Connecting-IP') ?? '',
+    evalToken: c.req.header(EVAL_TOKEN_HEADER) ?? '',
   })
   return new Response(stream, {
     status: 201,

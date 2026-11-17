@@ -2,7 +2,7 @@
 
 ## 1. Summary
 
-Repotron runs on Cloudflare. Three TypeScript Workers and one Python container do the work. [phase-1-plan.md](phase-1-plan.md) holds the Phase 1 detail: each column, each route step, and each config value.
+Repotron runs on Cloudflare. Three TypeScript Workers and one Python container do the work. [phase-1-plan.md](phase-1-plan.md) holds the completed Phase 1 detail. [phase-2-plan.md](phase-2-plan.md) holds the eval gate.
 
 - `apps/web` is a static web app. An assets-only Worker serves it. It holds no API code. The browser calls the gateway over HTTPS.
 - `apps/gateway` is the public API Worker. It starts an index job and answers questions.
@@ -375,7 +375,7 @@ The trace calls no model, so it costs no tokens.
 - **Abuse.** Turnstile and the `RateLimiter` Durable Object guard the gateway. The size limits guard the container.
 - **CORS.** The gateway allows only the web origin. CORS does not stop a script outside a browser, so Turnstile and the rate limits stay the real guard.
 - **Index scope.** The index id comes from the route. Each Vectorize query sets the namespace. Each D1 chunk query filters on the index id. Each FTS5 query starts with the index id.
-- **Secrets.** `TURNSTILE_SECRET`, `GITHUB_TOKEN`, `OPENROUTER_API_KEY`, and `CF_AIG_TOKEN` are gateway secrets. The answer request sends `CF_AIG_TOKEN` in `cf-aig-authorization`. `GITHUB_TOKEN`, `R2_ACCESS_KEY_ID`, and `R2_SECRET_ACCESS_KEY` are pipeline secrets. The pipeline passes its three secrets to the container as environment variables. The web Worker has no secret.
+- **Secrets.** `TURNSTILE_SECRET`, `GITHUB_TOKEN`, `OPENROUTER_API_KEY`, `CF_AIG_TOKEN`, and `EVAL_TOKEN` are gateway secrets. The answer request sends `CF_AIG_TOKEN` in `cf-aig-authorization`. `GITHUB_TOKEN`, `R2_ACCESS_KEY_ID`, and `R2_SECRET_ACCESS_KEY` are pipeline secrets. The pipeline passes its three secrets to the container as environment variables. The web Worker has no secret.
 
 ---
 
@@ -390,7 +390,7 @@ One environment: staging. Each resource name is `repotron-staging-<role>`, such 
   3. Create each missing CI resource: the R2 bucket, the Vectorize index with its metadata indexes, and the AI Gateway.
   4. Deploy the pipeline, then the gateway. The gateway binds a Workflow of the pipeline. The pipeline deploy builds the indexer image, so the runner needs Docker.
 - `.github/workflows/deploy-web.yml` runs on a push to `develop` when `apps/web`, `packages/domain`, or the lockfile changes. It checks the web package and deploys `repotron-staging-web`. A web-only change does not run the staging workflow.
-- Phase 2: run `apps/evals` against staging. Fail on a regression.
+- Phase 2: run `apps/evals` against staging. Fail on a regression. [phase-2-plan.md](phase-2-plan.md) holds the stages.
 - Manual setup: the Cloudflare API token, the D1 database, the Turnstile widget, the GitHub token, the OpenRouter key, the R2 API keys, and the Worker secrets. Each one gives a value that goes into the code or into a secret. [phase-1-plan.md](phase-1-plan.md), section 7, gives the delivery stages and each manual step.
 
 ### Why these Cloudflare products

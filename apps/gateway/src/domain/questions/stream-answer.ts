@@ -189,6 +189,7 @@ async function saveQuestion(
     question: input.question,
     answer,
     citations: JSON.stringify(citations.filter((citation) => cited.has(citation.number))),
+    retrievedCitations: JSON.stringify(citations),
     embeddingModelId: EMBEDDING_MODEL_ID,
     answerModelId: getConfig().ANSWER_MODEL_ID,
     inputTokens: done.inputTokens,

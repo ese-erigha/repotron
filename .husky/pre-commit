@@ -1,5 +1,10 @@
 set -e
 
+if ! command -v pnpm >/dev/null 2>&1; then
+  NODE_BIN="$(dirname "$(command -v node)")"
+  corepack enable --install-directory "$NODE_BIN"
+fi
+
 REPOTRON_SYNC_MIGRATIONS_STAGE=1 pnpm db:sync
 pnpm lint
 pnpm typecheck

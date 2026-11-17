@@ -218,21 +218,23 @@ These are targets. Measure them on staging.
 
 [phase-1-plan.md](phase-1-plan.md) holds the delivery stages with each manual step, the schema, the routes, the staging checks, and the business constraints.
 
-- [ ] Add the pnpm workspace, the uv project of the indexer, and the shared packages.
-- [ ] Deploy the web app as an assets-only Worker that calls the gateway with CORS.
-- [ ] Add the D1 schema and the first migration.
-- [ ] Add the `RateLimiter` Durable Object for the hourly limits.
-- [ ] Validate the link, read the repository from the GitHub API, and check the limits.
-- [ ] Build the Python indexer image: fetch the tarball, parse with Tree-sitter, and write chunk batches to R2.
-- [ ] Run the `RepositoryIndexing` Workflow: parse, store, embed, wait for Vectorize, and mark ready.
-- [ ] Add dense retrieval and the streamed answer from `anthropic/claude-haiku-5.5` on OpenRouter, with citations.
-- [ ] Send each model call through AI Gateway. Store the model ids, the tokens, and the latency in the `questions` row.
-- [ ] Add the home, status, and ask screens.
-- [ ] Add the two preset buttons.
-- [ ] Add the Share button and the answer page.
-- [ ] Add the `IndexDeletion` Workflow and the cleanup cron.
+- [x] Add the pnpm workspace, the uv project of the indexer, and the shared packages.
+- [x] Deploy the web app as an assets-only Worker that calls the gateway with CORS.
+- [x] Add the D1 schema and the first migration.
+- [x] Add the `RateLimiter` Durable Object for the hourly limits.
+- [x] Validate the link, read the repository from the GitHub API, and check the limits.
+- [x] Build the Python indexer image: fetch the tarball, parse with Tree-sitter, and write chunk batches to R2.
+- [x] Run the `RepositoryIndexing` Workflow: parse, store, embed, wait for Vectorize, and mark ready.
+- [x] Add dense retrieval and the streamed answer from `anthropic/claude-haiku-5.5` on OpenRouter, with citations.
+- [x] Send each model call through AI Gateway. Store the model ids, the tokens, and the latency in the `questions` row.
+- [x] Add the home, status, and ask screens.
+- [x] Add the two preset buttons.
+- [x] Add the Share button and the answer page.
+- [x] Add the `IndexDeletion` Workflow and the cleanup cron.
 
 ### Phase 2: Eval gate
+
+[phase-2-plan.md](phase-2-plan.md) holds the delivery stages.
 
 - [ ] Add the golden set: 3 repositories at fixed commits, and 60 questions at least.
 - [ ] Add the retrieval metrics and the LLM-judge metrics.

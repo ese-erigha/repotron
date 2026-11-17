@@ -9,6 +9,7 @@ export const answeredQuestions = sqliteTable('answered_questions', {
   question: text('question').notNull(),
   answer: text('answer').notNull(),
   citations: text('citations').notNull(),
+  retrievedCitations: text('retrieved_citations'),
   embeddingModelId: text('embedding_model_id').notNull(),
   answerModelId: text('answer_model_id').notNull(),
   inputTokens: integer('input_tokens'),
