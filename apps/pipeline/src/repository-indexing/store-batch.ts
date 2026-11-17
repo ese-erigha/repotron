@@ -12,8 +12,10 @@ export async function storeBatch(indexId: string, key: string): Promise<string> 
   await getRepositories().sourceChunks.insertBatch(rows)
   const vectors = await embedTexts(chunks.map((chunk) => formatChunkInput(chunk.header, chunk.content)))
   const upserts = chunks.map((chunk, index) => toVector(indexId, chunk, vectors[index]))
+  // Vectorize stamps the mutation before this call returns. A later time stays ahead of that stamp.
+  const upsertedAt = new Date().toISOString()
   await getVectors().upsert(upserts)
-  return new Date().toISOString()
+  return upsertedAt
 }
 
 function parseBatch(text: string) {

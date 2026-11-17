@@ -852,7 +852,7 @@ Each step does one side effect and retries on its own: 3 retries, exponential ba
    - Insert the rows with one `db.batch()` call that holds one `INSERT … ON CONFLICT DO NOTHING` for each chunk. D1 allows 100 bound parameters in each statement, so one multi-row insert cannot hold 500 chunks.
    - Embed `formatChunkInput(header, content)` in groups of `EMBED_BATCH_SIZE`.
    - Upsert the vectors: id = chunk id, namespace = index id, metadata `{ path, language, kind }`.
-   - Return the time of the last upsert.
+   - Return the time taken immediately before the upsert. Vectorize stamps the mutation before the call returns, so a later time stays ahead of that stamp.
 6. **Wait for the vectors** (`wait-for-vectors.ts`). Vectorize upserts are asynchronous. Call `describe()`. When `processedUpToDatetime` is earlier than the last upsert time, throw. The step retries every 5 seconds, up to 60 times.
    - Do not compare `processedUpToMutation` with one mutation id. A parallel job can move it past that id.
 7. **Mark ready.** Set `status = ready`, `chunk_count`, and `ready_at`.

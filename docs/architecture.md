@@ -107,7 +107,7 @@ The pipeline Worker sets the status to `embedding` and stores the file count. Fo
 
 ### 5. Wait for the vectors — pipeline Worker
 
-Vectorize applies an upsert after the call returns. The pipeline Worker calls `describe()` and compares `processedUpToDatetime` with the time of the last upsert. The step retries every 5 seconds until Vectorize has caught up.
+Vectorize stamps each upsert before the call returns, then applies it. The pipeline Worker records the time immediately before the last upsert. It calls `describe()` and compares `processedUpToDatetime` with that time. The step retries every 5 seconds until Vectorize has caught up.
 
 ### 6. Finish — pipeline Worker
 
@@ -185,7 +185,7 @@ Hono. One controller for each route group. One use case for each action.
      - The 30-second query limit applies to the whole batch.
    - Embed the chunk text with the embedding model.
    - Upsert the vectors into the namespace of the index.
-6. Wait for the vectors. Vectorize upserts are asynchronous. The step checks `processedUpToDatetime` from `describe()` against the time of the last upsert, and retries until Vectorize catches up.
+6. Wait for the vectors. Vectorize upserts are asynchronous. The step checks `processedUpToDatetime` from `describe()` against the time recorded immediately before the last upsert, and retries until Vectorize catches up.
 7. Set the status to `ready`, with the file count and the chunk count.
 8. Delete the batches in R2.
 9. Start one `IndexDeletion` for each earlier index of the same repository. Refer to Scenario C.

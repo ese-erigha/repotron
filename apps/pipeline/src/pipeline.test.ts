@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
+import { setTimeout } from 'node:timers/promises'
 
 import type { PipelineContext } from './context.ts'
 import { pipelineStorage } from './context.ts'
 import { startDeletions } from './delete-stale-indexes/delete-stale-indexes.ts'
 import { deleteNextPage } from './index-deletion/delete-page.ts'
 import { readParseResult } from './indexer-container/parse-result.ts'
+import { storeBatch } from './repository-indexing/store-batch.ts'
 import { assertVectorsReady } from './repository-indexing/wait-for-vectors.ts'
 
 describe('assertVectorsReady', () => {
@@ -20,6 +22,31 @@ describe('assertVectorsReady', () => {
   it('when the vectors were processed after the last upsert, then the wait finishes', async () => {
     const context = vectorsContext('2026-01-01T00:00:10.000Z')
     await pipelineStorage.run(context, () => assertVectorsReady('2026-01-01T00:00:05.000Z'))
+  })
+})
+
+describe('storeBatch', () => {
+  it('when a batch is stored, then the recorded time is from before the upsert', async () => {
+    let upsertStartedAt = 0
+    const context = {
+      config: { AI_GATEWAY_ID: 'gateway' },
+      batches: {
+        get: async () => ({
+          text: async () =>
+            '{"id":"9-abc:0","seq":0,"path":"src/a.ts","language":"typescript","symbol":null,"kind":"function","startLine":1,"endLine":2,"content":"const a = 1","header":"a","identifiers":"a"}',
+        }),
+      },
+      repositories: { sourceChunks: { insertBatch: async () => undefined } },
+      ai: { run: async () => ({ data: [{ embedding: [0.1] }] }) },
+      vectors: {
+        upsert: async () => {
+          upsertStartedAt = Date.now()
+          await setTimeout(30)
+        },
+      },
+    } as unknown as PipelineContext
+    const recorded = await pipelineStorage.run(context, () => storeBatch('9-abc', 'batch-0.jsonl'))
+    assert.ok(Date.parse(recorded) <= upsertStartedAt)
   })
 })
 
