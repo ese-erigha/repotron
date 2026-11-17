@@ -15,6 +15,7 @@ export const repositoryIndexes = sqliteTable(
     failureReason: text('failure_reason'),
     fileCount: integer('file_count'),
     chunkCount: integer('chunk_count'),
+    chunkTotal: integer('chunk_total'),
     embeddingModelId: text('embedding_model_id').notNull(),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),

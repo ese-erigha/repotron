@@ -6,6 +6,7 @@ export const LINE_WINDOW = 60
 export const LINE_OVERLAP = 10
 export const CHUNK_BATCH_SIZE = 500
 export const EMBED_BATCH_SIZE = 1
+export const EMBED_CONCURRENCY = 10
 export const DELETE_PAGE_SIZE = 500
 export const CONTEXT_CHUNKS = 8
 export const START_HERE_MAX_PATHS = 500

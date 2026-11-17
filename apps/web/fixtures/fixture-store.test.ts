@@ -54,6 +54,23 @@ describe('fixture store', () => {
     assert.deepEqual({ status: second.status, id: second.index.id }, { status: 200, id: first.index.id })
   })
 
+  it('when the job is embedding, then the chunk count grows before the index is ready', () => {
+    const store = new FixtureStore(NOW)
+    const embeddingStart = INDEX_TIMELINE.normal.queuedMs + INDEX_TIMELINE.normal.parsingMs
+    const span = INDEX_TIMELINE.normal.embeddingMs
+    store.requestIndex(NEW_LINK, NOW)
+
+    const early = store.requestIndex(NEW_LINK, NOW + embeddingStart + Math.floor(span * 0.2))
+    const later = store.requestIndex(NEW_LINK, NOW + embeddingStart + Math.floor(span * 0.6))
+    const ready = store.requestIndex(NEW_LINK, NOW + readyAfterMs(INDEX_TIMELINE.normal))
+
+    assert.equal(early.index.status, INDEX_STATUS.embedding)
+    assert.equal(early.index.chunkTotal, ready.index.chunkCount)
+    assert.ok(early.index.chunkCount !== null && early.index.chunkCount > 0)
+    assert.ok(later.index.chunkCount !== null && early.index.chunkCount < later.index.chunkCount)
+    assert.ok(later.index.chunkCount < (ready.index.chunkCount ?? 0))
+  })
+
   it('when every stage of the job passed, then the index is ready with its counts', () => {
     const store = new FixtureStore(NOW)
     const created = store.requestIndex(NEW_LINK, NOW)

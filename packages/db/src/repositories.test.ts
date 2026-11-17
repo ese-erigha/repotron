@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { describe, it } from 'node:test'
 import Database from 'better-sqlite3'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
@@ -15,7 +15,9 @@ const DAY_MS = 24 * 60 * 60 * 1000
 function openRepositories(): RepotronRepositories {
   const sqlite = new Database(':memory:')
   sqlite.pragma('foreign_keys = ON')
-  sqlite.exec(readFileSync(new URL('../../../infra/migrations/0000_phase1_initial.sql', import.meta.url), 'utf8'))
+  const directory = new URL('../../../infra/migrations/', import.meta.url)
+  const files = readdirSync(directory).filter((name) => name.endsWith('.sql')).sort()
+  for (const name of files) sqlite.exec(readFileSync(new URL(name, directory), 'utf8'))
   const database = drizzle(sqlite, { schema })
   const batchDatabase = Object.assign(database, {
     async batch(statements: readonly PromiseLike<unknown>[]): Promise<void> {
@@ -83,6 +85,32 @@ describe('repositories', () => {
     await repositories.sourceChunks.insertBatch([chunk('9-abc:0', 0)])
     const ids = await repositories.sourceChunks.listIdPage({ indexId: '9-abc', limit: 10 })
     assert.deepEqual(ids, ['9-abc:0'])
+  })
+
+  it('when two chunks are stored, then the index records that count', async () => {
+    const repositories = openRepositories()
+    await repositories.githubRepositories.upsert({
+      id: '9',
+      owner: 'owner',
+      name: 'repo',
+      defaultBranch: 'main',
+      now: 1,
+    })
+    await repositories.repositoryIndexes.insertQueued({
+      id: '9-abc',
+      repositoryId: '9',
+      commitSha: 'abc',
+      embeddingModelId: EMBEDDING_MODEL_ID,
+      now: 1,
+    })
+    await repositories.sourceChunks.insertBatch([chunk('9-abc:0', 0), chunk('9-abc:1', 1)])
+
+    const stored = await repositories.sourceChunks.countByIndex('9-abc')
+    await repositories.repositoryIndexes.recordChunkProgress({ id: '9-abc', chunkCount: stored, chunkTotal: 4, now: 2 })
+
+    const row = await repositories.repositoryIndexes.get('9-abc')
+    assert.equal(row?.chunkCount, 2)
+    assert.equal(row?.chunkTotal, 4)
   })
 
   it('when a page of chunks is deleted, then a later chunk remains', async () => {

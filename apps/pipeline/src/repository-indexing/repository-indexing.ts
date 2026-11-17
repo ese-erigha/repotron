@@ -12,6 +12,7 @@ import {
   markFailed,
   markParsing,
   markReady,
+  recordChunkProgress,
 } from './index-status.ts'
 import { storeBatch } from './store-batch.ts'
 import { assertVectorsReady } from './wait-for-vectors.ts'
@@ -42,7 +43,7 @@ export class RepositoryIndexing extends WorkflowEntrypoint<Record<string, unknow
       await step.do('stop the container', STEP, () => pipelineStorage.run(context, () => stopContainer(params.indexId)))
       stage = INDEX_STATUS.embedding
       await step.do('mark embedding', STEP, () =>
-        pipelineStorage.run(context, () => markEmbedding(params.indexId, parsed.fileCount)),
+        pipelineStorage.run(context, () => markEmbedding(params.indexId, parsed.fileCount, parsed.chunkCount)),
       )
       const lastUpsertAt = await storeEveryBatch(step, context, params.indexId, parsed)
       await step.do('wait for the vectors', WAIT, () =>
@@ -71,6 +72,9 @@ async function storeEveryBatch(
   for (const [number, key] of parsed.batchKeys.entries()) {
     lastUpsertAt = await step.do(`store batch ${number}`, STEP, () =>
       pipelineStorage.run(context, () => storeBatch(indexId, key)),
+    )
+    await step.do(`record chunk progress ${number}`, STEP, () =>
+      pipelineStorage.run(context, () => recordChunkProgress(indexId, parsed.chunkCount)),
     )
   }
   return lastUpsertAt

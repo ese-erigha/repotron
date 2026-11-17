@@ -6,6 +6,7 @@ import type { PipelineContext } from './context.ts'
 import { pipelineStorage } from './context.ts'
 import { startDeletions } from './delete-stale-indexes/delete-stale-indexes.ts'
 import { deleteNextPage } from './index-deletion/delete-page.ts'
+import { embedTexts } from './embeddings.ts'
 import { readParseResult } from './indexer-container/parse-result.ts'
 import { storeBatch } from './repository-indexing/store-batch.ts'
 import { assertVectorsReady } from './repository-indexing/wait-for-vectors.ts'
@@ -35,6 +36,23 @@ describe('assertVectorsReady', () => {
   it('when the vectors were processed after the last upsert, then the wait finishes', async () => {
     const context = vectorsContext('2026-01-01T00:00:10.000Z')
     await pipelineStorage.run(context, () => assertVectorsReady('2026-01-01T00:00:05.000Z'))
+  })
+})
+
+describe('embedTexts', () => {
+  it('when 12 texts are embedded, then 10 calls run together', async () => {
+    const run = await embedNumberedTexts(12)
+
+    assert.equal(run.maxActive, 10)
+  })
+
+  it('when 12 texts are embedded, then each vector keeps its text position', async () => {
+    const run = await embedNumberedTexts(12)
+
+    assert.deepEqual(
+      run.vectors,
+      [[0], [1], [2], [3], [4], [5], [6], [7], [8], [9], [10], [11]],
+    )
   })
 })
 
@@ -112,6 +130,27 @@ describe('readParseResult', () => {
     await assert.rejects(() => readParseResult(response), /not found/)
   })
 })
+
+async function embedNumberedTexts(count: number): Promise<{ maxActive: number; vectors: number[][] }> {
+  let active = 0
+  let maxActive = 0
+  const texts = Array.from({ length: count }, (_, index) => `text-${index}`)
+  const context = {
+    config: { AI_GATEWAY_ID: 'gateway' },
+    ai: {
+      run: async (_model: string, input: { input: string[] }) => {
+        active += 1
+        maxActive = Math.max(maxActive, active)
+        await setTimeout(20)
+        active -= 1
+        const text = input.input[0] ?? ''
+        return { data: [{ embedding: [Number(text.slice('text-'.length))] }] }
+      },
+    },
+  } as unknown as PipelineContext
+  const vectors = await pipelineStorage.run(context, () => embedTexts(texts))
+  return { maxActive, vectors }
+}
 
 function vectorsContext(processedUpToDatetime: string): PipelineContext {
   return {

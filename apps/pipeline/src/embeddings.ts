@@ -1,14 +1,28 @@
-import { EMBED_BATCH_SIZE, EMBEDDING_MODEL_ID } from 'repotron-domain'
+import { EMBED_BATCH_SIZE, EMBED_CONCURRENCY, EMBEDDING_MODEL_ID } from 'repotron-domain'
 
 import { getAi, getPipelineConfig } from './context.ts'
 
+const WAVE_SIZE = EMBED_BATCH_SIZE * EMBED_CONCURRENCY
+
 export async function embedTexts(texts: string[]): Promise<number[][]> {
   const vectors: number[][] = []
-  for (let start = 0; start < texts.length; start += EMBED_BATCH_SIZE) {
-    const batch = texts.slice(start, start + EMBED_BATCH_SIZE)
-    const embedded = await embedBatch(batch)
+  for (let start = 0; start < texts.length; start += WAVE_SIZE) {
+    const wave = texts.slice(start, start + WAVE_SIZE)
+    const embedded = await embedWave(wave)
     vectors.push(...embedded)
   }
+  return vectors
+}
+
+async function embedWave(texts: string[]): Promise<number[][]> {
+  const calls: Promise<number[][]>[] = []
+  for (let start = 0; start < texts.length; start += EMBED_BATCH_SIZE) {
+    const batch = texts.slice(start, start + EMBED_BATCH_SIZE)
+    calls.push(embedBatch(batch))
+  }
+  const embedded = await Promise.all(calls)
+  const vectors: number[][] = []
+  for (const batch of embedded) vectors.push(...batch)
   return vectors
 }
 

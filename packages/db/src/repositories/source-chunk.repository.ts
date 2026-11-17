@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, lte } from 'drizzle-orm'
+import { and, asc, count, eq, inArray, lte } from 'drizzle-orm'
 
 import type { RepotronDatabase } from '../create-database.ts'
 import { sourceChunks, type NewSourceChunkRecord, type SourceChunkRecord } from '../schema/source-chunks.ts'
@@ -22,6 +22,14 @@ export class SourceChunkRepository {
     const [first, ...rest] = statements
     if (!first) return
     await this.database.batch([first, ...rest])
+  }
+
+  async countByIndex(indexId: string): Promise<number> {
+    const rows = await this.database
+      .select({ total: count() })
+      .from(sourceChunks)
+      .where(eq(sourceChunks.indexId, indexId))
+    return rows[0]?.total ?? 0
   }
 
   async listByIds(input: ListChunksByIdInput): Promise<SourceChunkRecord[]> {

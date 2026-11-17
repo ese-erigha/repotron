@@ -86,24 +86,25 @@ The gateway calls the GitHub API. It does not download the files.
 
 ### 3. Parse the files — container
 
-The pipeline Worker sets the status to `parsing`, then calls `POST /index` on the container. The container does this work:
+The pipeline Worker sets the status to `parsing` and starts the indexer container. This phase writes R2 only. D1 and Vectorize stay empty.
 
-- Download `GET /repos/{owner}/{repo}/tarball/{sha}` and extract it. The tarball is that commit. The container runs no git command.
-- Walk the files. Skip vendored folders, lock files, minified files, binary files, and files over 1 MB.
-- Split each code file with Tree-sitter. A function, a method, or a class stays in one chunk. A README splits at its headings.
-- Write the chunks to R2 as JSONL, 500 chunks in each object, under `indexes/<indexId>/batch-<n>.jsonl`.
-- Return the file count, the chunk count, and the batch keys.
+1. The container downloads the repository tarball from GitHub at that commit. It runs no git command.
+2. It walks the files. It skips vendored folders, lock files, minified files, binary files, and files over 1 MB.
+3. It splits the remaining files into chunks. Tree-sitter keeps a function, a method, or a class in one chunk. A README splits at its headings.
+4. It writes the chunks to R2 as JSONL, 500 chunks in each object, under `indexes/<indexId>/batch-<n>.jsonl`.
+5. It returns the file count, the chunk count, and the batch keys. The pipeline Worker then stops the container.
 
-The pipeline Worker then stops the container. The later phases read R2. They do not call the container.
+The later phases read R2. They do not call the container.
 
 ### 4. Store and embed — pipeline Worker
 
-The pipeline Worker sets the status to `embedding` and stores the file count. For each batch it runs one Workflow step:
+The pipeline Worker sets the status to `embedding` and stores the file count and the total chunk count. For each R2 file it runs one Workflow step. The next file starts only after that step finishes.
 
-- Read the JSONL object from R2.
-- Insert the chunk rows into D1. One statement inserts one chunk.
-- Call Workers AI `@cf/google/embeddinggemma-2` with `{ input }` for that batch. Each string is `title: <header> | text: <content>`.
-- Upsert the vectors into Vectorize. The namespace is the index id.
+1. Read the JSONL object from R2.
+2. Insert those chunks into `source_chunks`. One statement inserts one chunk. The row exists before the vector does.
+3. Embed the chunk text with Workers AI `@cf/google/embeddinggemma-2`. Each string is `title: <header> | text: <content>`. Each call sends one text. Ten calls run at the same time.
+4. Upsert the vectors into Vectorize. The namespace is the index id.
+5. Record the stored chunk count on the index row. The status card shows that count on its next poll.
 
 ### 5. Wait for the vectors — pipeline Worker
 
@@ -175,16 +176,17 @@ Hono. One controller for each route group. One use case for each action.
 **`RepositoryIndexing` Workflow.** Each step does one side effect and retries on its own.
 
 1. Set the status to `parsing`.
-2. Start the container for this index. Call `POST /index` with the owner, the repository, the commit, and the index id. Wait for the batch list.
+2. Start the container for this index. Call `POST /index` with the owner, the repository, the commit, and the index id. The container downloads the tarball, writes the chunk files to R2, and returns the batch list. D1 and Vectorize stay empty.
 3. Stop the container with `destroy()`. The batches are in R2, so the later steps do not need it.
-4. Set the status to `embedding`.
+4. Set the status to `embedding`, and store the file count and the total chunk count.
 5. For each batch key, run one step:
    - Read the JSONL batch from R2.
-   - Insert the chunks into D1 with one `db.batch()` call that holds one `INSERT … ON CONFLICT DO NOTHING` for each chunk.
+   - Insert the chunks into `source_chunks` with one `db.batch()` call that holds one `INSERT … ON CONFLICT DO NOTHING` for each chunk. The row exists before the vector does.
      - D1 allows 100 bound parameters and 100 KB in each statement. So one multi-row `INSERT` cannot hold 500 chunks.
      - The 30-second query limit applies to the whole batch.
-   - Embed the chunk text with the embedding model.
+   - Embed the chunk text with the embedding model. Each call sends one text. Ten calls run at the same time.
    - Upsert the vectors into the namespace of the index.
+   - Record the stored chunk count on the index.
 6. Wait for the vectors. Vectorize upserts are asynchronous. The step checks `processedUpToDatetime` from `describe()` against the time recorded immediately before the last upsert, and retries until Vectorize catches up.
 7. Set the status to `ready`, with the file count and the chunk count.
 8. Delete the batches in R2.
@@ -270,7 +272,7 @@ AI Gateway fronts each model call. It records the model id, the tokens, and the 
 - **Embeddings.** Phase 1 starts with the Workers AI model `@cf/google/embeddinggemma-2`. It covers code, gives 768 dimensions, and has an 8,192-token context window.
   - The model id is the constant `EMBEDDING_MODEL_ID` in `packages/domain`, not a Worker var. The gateway and the pipeline must use the same model, and the Vectorize dimension depends on it.
   - The model expects task prefixes. A question becomes `task: search result | query: <question>`. A chunk uses the `title` and `text` form in the chunk rules.
-  - One request allows 8,192 tokens. That limit is the sum of every text in the request. `EMBED_BATCH_SIZE` is 1, so one chunk at the 1,500-token cap stays under that limit.
+  - One request allows 8,192 tokens. That limit is the sum of every text in the request. `EMBED_BATCH_SIZE` is 1, so one chunk at the 1,500-token cap stays under that limit. `EMBED_CONCURRENCY` is 10, so ten calls run at the same time.
   - Phase 3 compares it with `voyage-code-3` and `text-embedding-3-small` through AI Gateway. Each candidate fits the Vectorize limit of 1536 dimensions.
 - **Reranker.** Phase 3 starts with Workers AI `bge-reranker-base`. The ablation compares it with Cohere Rerank through AI Gateway.
 - **Answer model.** OpenRouter model `anthropic/claude-haiku-5.5`, through the AI Gateway OpenRouter route. Stream the tokens. Temperature 0. The Worker var is `ANSWER_MODEL_ID`. The gateway calls it with `fetch`, with no SDK.
@@ -435,7 +437,7 @@ repotron/
     └── migrations/              # D1 SQL
 ```
 
-`packages/domain` holds the Phase 1 constants. Examples: `MAX_CHUNK_TOKENS` (1,500, a starting value), `CONTEXT_CHUNKS` (8), `EMBED_BATCH_SIZE` (1), `START_HERE_MAX_PATHS` (500), and `EMBEDDING_MODEL_ID`. Phase 3 adds `RRF_K` (60), `RETRIEVAL_TOP_K` (50), `CONFIDENCE_HIGH` (0.7), and `CONFIDENCE_MEDIUM` (0.3).
+`packages/domain` holds the Phase 1 constants. Examples: `MAX_CHUNK_TOKENS` (1,500, a starting value), `CONTEXT_CHUNKS` (8), `EMBED_BATCH_SIZE` (1), `EMBED_CONCURRENCY` (10), `START_HERE_MAX_PATHS` (500), and `EMBEDDING_MODEL_ID`. Phase 3 adds `RRF_K` (60), `RETRIEVAL_TOP_K` (50), `CONFIDENCE_HIGH` (0.7), and `CONFIDENCE_MEDIUM` (0.3).
 
 `MAX_CHUNK_TOKENS` keeps the header and the content under the 8,192-token window of the embedding model. `tiktoken` counts tokens differently from the Gemma tokenizer, so the value leaves a margin.
 

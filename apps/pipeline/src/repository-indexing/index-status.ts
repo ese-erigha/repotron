@@ -7,8 +7,13 @@ export async function markParsing(indexId: string): Promise<void> {
   await getRepositories().repositoryIndexes.markParsing({ id: indexId, now: Date.now() })
 }
 
-export async function markEmbedding(indexId: string, fileCount: number): Promise<void> {
-  await getRepositories().repositoryIndexes.markEmbedding({ id: indexId, fileCount, now: Date.now() })
+export async function markEmbedding(indexId: string, fileCount: number, chunkTotal: number): Promise<void> {
+  await getRepositories().repositoryIndexes.markEmbedding({ id: indexId, fileCount, chunkTotal, now: Date.now() })
+}
+
+export async function recordChunkProgress(indexId: string, chunkTotal: number): Promise<void> {
+  const chunkCount = await getRepositories().sourceChunks.countByIndex(indexId)
+  await getRepositories().repositoryIndexes.recordChunkProgress({ id: indexId, chunkCount, chunkTotal, now: Date.now() })
 }
 
 export async function markReady(indexId: string, chunkCount: number): Promise<void> {

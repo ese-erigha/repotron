@@ -49,6 +49,7 @@ export const indexViewSchema = z.object({
   failureReason: z.string().nullable(),
   fileCount: z.number().int().nullable(),
   chunkCount: z.number().int().nullable(),
+  chunkTotal: z.number().int().nonnegative().nullable().default(null),
   fallbackIndexId: z.string().nullable(),
   createdAt: z.number().int(),
   readyAt: z.number().int().nullable(),

@@ -12,8 +12,9 @@ export type InsertQueuedIndexInput = {
   now: number
 }
 
-export type MarkEmbeddingInput = { id: string; fileCount: number; now: number }
+export type MarkEmbeddingInput = { id: string; fileCount: number; chunkTotal: number; now: number }
 export type MarkReadyInput = { id: string; chunkCount: number; now: number }
+export type RecordChunkProgressInput = { id: string; chunkCount: number; chunkTotal: number; now: number }
 export type MarkFailedInput = { id: string; failedStage: string; failureReason: string; now: number }
 export type FindNewestReadyInput = { repositoryId: string; excludeId: string }
 export type ListEarlierIndexesInput = { repositoryId: string; createdAt: number }
@@ -60,7 +61,17 @@ export class RepositoryIndexRepository {
   }
 
   async markEmbedding(input: MarkEmbeddingInput): Promise<void> {
-    const changes = { status: INDEX_STATUS.embedding, fileCount: input.fileCount, updatedAt: input.now }
+    const changes = {
+      status: INDEX_STATUS.embedding,
+      fileCount: input.fileCount,
+      chunkTotal: input.chunkTotal,
+      updatedAt: input.now,
+    }
+    await this.database.update(repositoryIndexes).set(changes).where(eq(repositoryIndexes.id, input.id))
+  }
+
+  async recordChunkProgress(input: RecordChunkProgressInput): Promise<void> {
+    const changes = { chunkCount: input.chunkCount, chunkTotal: input.chunkTotal, updatedAt: input.now }
     await this.database.update(repositoryIndexes).set(changes).where(eq(repositoryIndexes.id, input.id))
   }
 

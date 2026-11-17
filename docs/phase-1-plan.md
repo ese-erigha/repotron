@@ -180,6 +180,7 @@ These values are guesses until staging measures them. Each one lives in `package
 
 - `MAX_CHUNK_TOKENS` = 1,500 (`tiktoken` `cl100k_base`). The value leaves room under the 8,192-token window of the embedding model, because the Gemma tokenizer counts differently. 8 chunks then stay near 12,000 input tokens for the answer model.
 - `EMBED_BATCH_SIZE` = 1 text in each Workers AI call. The model limit of 8,192 tokens is the sum of the texts in one request. One chunk at `MAX_CHUNK_TOKENS` stays under that limit.
+- `EMBED_CONCURRENCY` = 10. That many embedding calls run at the same time. Each call still sends `EMBED_BATCH_SIZE` texts.
 - `QUESTION_MAX_CHARS` = 1,000. The value validates the question at the boundary.
 
 ### Decision I: The deploy branch
@@ -662,7 +663,7 @@ The intake upserts the row on each request, so a renamed repository keeps its id
 - `status` — text, not null. One of `INDEX_STATUS`.
 - `failed_stage` — text, null allowed. The status at the time of the failure.
 - `failure_reason` — text, null allowed. One plain sentence. It holds no token and no stack trace.
-- `file_count`, `chunk_count` — integer, null allowed. Set by the Workflow.
+- `file_count`, `chunk_count`, `chunk_total` — integer, null allowed. Set by the Workflow. `chunk_count` is the number stored so far. `chunk_total` is the number from the parse, saved when embedding starts.
 - `embedding_model_id` — text, not null
 - `created_at`, `updated_at` — integer, not null
 - `ready_at`, `last_question_at` — integer, null allowed
@@ -777,7 +778,7 @@ Body: `{ url, turnstileToken }`.
 
 ```
 { id, repository: { owner, name }, commitSha, status, failedStage, failureReason,
-  fileCount, chunkCount, fallbackIndexId, createdAt, readyAt }
+  fileCount, chunkCount, chunkTotal, fallbackIndexId, createdAt, readyAt }
 ```
 
 ### `GET /api/v1/indexes/:id`
@@ -846,13 +847,14 @@ Each step does one side effect and retries on its own: 3 retries, exponential ba
 1. **Mark parsing.** Set `status = parsing`.
 2. **Parse the repository.** `POST /index` on the container with `{ indexId, owner, name, commitSha }`. The step returns `{ fileCount, chunkCount, batchKeys }`.
 3. **Stop the container.** Call `destroy()`.
-4. **Mark embedding.** Set `status = embedding` and `file_count`.
+4. **Mark embedding.** Set `status = embedding`, `file_count`, and `chunk_total`.
 5. **Store batch `<n>`**, one step for each batch key (`store-batch.ts`):
    - Read the JSONL object from R2. Parse each line with the chunk schema from `packages/domain`.
    - Insert the rows with one `db.batch()` call that holds one `INSERT … ON CONFLICT DO NOTHING` for each chunk. D1 allows 100 bound parameters in each statement, so one multi-row insert cannot hold 500 chunks.
-   - Embed `formatChunkInput(header, content)` in groups of `EMBED_BATCH_SIZE`.
+   - Embed `formatChunkInput(header, content)` in groups of `EMBED_BATCH_SIZE`. `EMBED_CONCURRENCY` groups run at the same time.
    - Upsert the vectors: id = chunk id, namespace = index id, metadata `{ path, language, kind }`.
    - Return the time taken immediately before the upsert. Vectorize stamps the mutation before the call returns, so a later time stays ahead of that stamp.
+   - Record the stored chunk count on the index. The status card shows that count on its next poll.
 6. **Wait for the vectors** (`wait-for-vectors.ts`). Vectorize upserts are asynchronous. Call `describe()`. When `processedUpToDatetime` is earlier than the last upsert time, throw. The step retries every 5 seconds, up to 60 times.
    - Do not compare `processedUpToMutation` with one mutation id. A parallel job can move it past that id.
 7. **Mark ready.** Set `status = ready`, `chunk_count`, and `ready_at`.
@@ -921,7 +923,7 @@ Python 3.12 and uv. Dependencies: `fastapi`, `uvicorn`, `tree-sitter`, `tree-sit
   - Limits:
     - `REPOSITORY_MAX_KILOBYTES` (512,000), `REPOSITORY_MAX_FILES` (20,000), and `FILE_MAX_BYTES` (1,048,576)
     - `MAX_CHUNK_TOKENS` (1,500), `LINE_WINDOW` (60), `LINE_OVERLAP` (10), and `CHUNK_BATCH_SIZE` (500)
-    - `EMBED_BATCH_SIZE` (1), `DELETE_PAGE_SIZE` (500), and `CONTEXT_CHUNKS` (8)
+    - `EMBED_BATCH_SIZE` (1), `EMBED_CONCURRENCY` (10), `DELETE_PAGE_SIZE` (500), and `CONTEXT_CHUNKS` (8)
     - `START_HERE_MAX_PATHS` (500), `QUESTION_MAX_CHARS` (1,000), `RECENT_INDEX_COUNT` (10), and `INDEX_RETENTION_DAYS` (30)
     - `INDEX_REQUESTS_PER_HOUR` (5), `QUESTIONS_PER_HOUR` (30), and `STATUS_POLL_MS` (2,000)
   - Models: `EMBEDDING_MODEL_ID` (`@cf/google/embeddinggemma-2`) and `EMBEDDING_DIMENSIONS` (768)

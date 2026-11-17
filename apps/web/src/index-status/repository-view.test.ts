@@ -14,6 +14,7 @@ const READY_INDEX: IndexView = {
   failureReason: null,
   fileCount: 742,
   chunkCount: 6183,
+  chunkTotal: 6183,
   fallbackIndexId: null,
   createdAt: 1_794_700_000_000,
   readyAt: 1_794_700_300_000,

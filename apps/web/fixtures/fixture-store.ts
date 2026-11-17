@@ -118,7 +118,8 @@ export class FixtureStore {
       failedStage: isFailed ? INDEX_STATUS.parsing : null,
       failureReason: isFailed ? PARSING_FAILURE_REASON : null,
       fileCount: hasFileCount ? index.repository.fileCount : null,
-      chunkCount: isReady ? index.repository.chunkCount : null,
+      chunkCount: chunkCountAt(index, status, now - index.startedAt),
+      chunkTotal: status === INDEX_STATUS.embedding || isReady ? index.repository.chunkCount : null,
       fallbackIndexId: isReady ? null : this.findReadyIndexId(index, now),
       createdAt: index.createdAt,
       readyAt: isReady ? index.startedAt + readyAfterMs(index.timeline) : null,
@@ -217,6 +218,14 @@ export class FixtureStore {
 
 function fullNameOf(repository: FixtureRepository): string {
   return `${repository.owner}/${repository.name}`.toLowerCase()
+}
+
+function chunkCountAt(index: StoredIndex, status: ReturnType<typeof statusAt>, elapsedMs: number): number | null {
+  if (status === INDEX_STATUS.ready) return index.repository.chunkCount
+  if (status !== INDEX_STATUS.embedding || index.timeline.embeddingMs === 0) return null
+  const start = index.timeline.queuedMs + index.timeline.parsingMs
+  const done = Math.min(index.timeline.embeddingMs, Math.max(0, elapsedMs - start))
+  return Math.floor((index.repository.chunkCount * done) / index.timeline.embeddingMs)
 }
 
 function timelineFor(fullName: string): IndexTimeline {

@@ -4,6 +4,7 @@ import { formatCount } from '../ui/format'
 import { Spinner } from '../ui/spinner'
 import { SurfaceCard } from '../ui/surface-card'
 import { SURFACE_ELEVATION } from '../ui/surface-card.constants'
+import { ChunkProgress } from './chunk-progress.tsx'
 import { INDEX_STATUS_TEXT, STAGE_DESCRIPTION } from './index-status.constants'
 import { STAGE_ORDER, type IndexStage } from './index-stage'
 import { StageProgress } from './stage-progress'
@@ -13,9 +14,11 @@ type IndexStatusCardProps = { index: IndexView }
 /** The progress of an index job: the stage, its description, and the counts. */
 export function IndexStatusCard({ index }: IndexStatusCardProps) {
   const stage: IndexStage = STAGE_ORDER.find((entry) => entry === index.status) ?? STAGE_ORDER[0]
+  const chunkTotal = index.chunkTotal
+  const hasTotal = chunkTotal !== null && chunkTotal > 0
   const counts = [
     { label: INDEX_STATUS_TEXT.FILES, value: index.fileCount },
-    { label: INDEX_STATUS_TEXT.CHUNKS, value: index.chunkCount },
+    { label: INDEX_STATUS_TEXT.CHUNKS, value: hasTotal ? (index.chunkCount ?? 0) : index.chunkCount },
   ]
 
   return (
@@ -40,6 +43,7 @@ export function IndexStatusCard({ index }: IndexStatusCardProps) {
           </div>
         ))}
       </dl>
+      {hasTotal ? <ChunkProgress stored={index.chunkCount} total={chunkTotal} /> : null}
       <p className="mt-5 text-[13px] text-mute">{INDEX_STATUS_TEXT.POLL_NOTE}</p>
     </SurfaceCard>
   )
