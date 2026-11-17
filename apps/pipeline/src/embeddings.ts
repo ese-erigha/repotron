@@ -2,12 +2,12 @@ import { EMBED_BATCH_SIZE, EMBED_CONCURRENCY, EMBEDDING_MODEL_ID } from 'repotro
 
 import { getAi, getPipelineConfig } from './context.ts'
 
-const WAVE_SIZE = EMBED_BATCH_SIZE * EMBED_CONCURRENCY
+export const EMBEDDING_WAVE_SIZE = EMBED_BATCH_SIZE * EMBED_CONCURRENCY
 
 export async function embedTexts(texts: string[]): Promise<number[][]> {
   const vectors: number[][] = []
-  for (let start = 0; start < texts.length; start += WAVE_SIZE) {
-    const wave = texts.slice(start, start + WAVE_SIZE)
+  for (let start = 0; start < texts.length; start += EMBEDDING_WAVE_SIZE) {
+    const wave = texts.slice(start, start + EMBEDDING_WAVE_SIZE)
     const embedded = await embedWave(wave)
     vectors.push(...embedded)
   }

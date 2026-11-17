@@ -1,0 +1,138 @@
+repository: pallets/flask
+commitSha: 49943b5a94413a530761350f04e896f76e8d620e
+indexId: 596892-49943b5a94413a530761350f04e896f76e8d620e
+questions:
+  - id: flask-identifier-01
+    kind: identifier
+    question: Where is the route decorator defined?
+    ranges:
+      - path: src/flask/sansio/scaffold.py
+        startLine: 343
+        endLine: 373
+  - id: flask-identifier-02
+    kind: identifier
+    question: Where is jsonify defined?
+    ranges:
+      - path: src/flask/json/__init__.py
+        startLine: 138
+        endLine: 170
+  - id: flask-identifier-03
+    kind: identifier
+    question: Where is render_template defined?
+    ranges:
+      - path: src/flask/templating.py
+        startLine: 136
+        endLine: 148
+  - id: flask-concept-01
+    kind: concept
+    question: How does Flask turn a view return value into a response?
+    ranges:
+      - path: src/flask/app.py
+        startLine: 1267
+        endLine: 1407
+  - id: flask-concept-02
+    kind: concept
+    question: How does Flask dispatch a request to a view?
+    ranges:
+      - path: src/flask/app.py
+        startLine: 993
+        endLine: 1021
+  - id: flask-concept-03
+    kind: concept
+    question: How does Flask register a URL rule?
+    ranges:
+      - path: src/flask/sansio/scaffold.py
+        startLine: 375
+        endLine: 441
+  - id: flask-concept-04
+    kind: concept
+    question: How does the WSGI entry call the Flask app?
+    ranges:
+      - path: src/flask/app.py
+        startLine: 1627
+        endLine: 1677
+  - id: flask-architecture-01
+    kind: architecture
+    question: What is Flask?
+    ranges:
+      - path: README.md
+        startLine: 3
+        endLine: 19
+  - id: flask-architecture-02
+    kind: architecture
+    question: Where does the Flask readme show a minimal app?
+    ranges:
+      - path: README.md
+        startLine: 23
+        endLine: 37
+  - id: flask-architecture-03
+    kind: architecture
+    question: Where is the Blueprint class defined?
+    ranges:
+      - path: src/flask/blueprints.py
+        startLine: 18
+        endLine: 128
+  - id: flask-start-01
+    kind: start_here
+    preset: start_here
+    ranges:
+      - path: README.md
+        startLine: 3
+        endLine: 19
+  - id: flask-start-02
+    kind: start_here
+    preset: start_here
+    ranges:
+      - path: README.md
+        startLine: 23
+        endLine: 37
+  - id: flask-start-03
+    kind: start_here
+    preset: start_here
+    ranges:
+      - path: src/flask/app.py
+        startLine: 308
+        endLine: 361
+  - id: flask-start-04
+    kind: start_here
+    preset: start_here
+    ranges:
+      - path: src/flask/sansio/scaffold.py
+        startLine: 343
+        endLine: 373
+  - id: flask-feature-01
+    kind: feature
+    preset: explain_feature
+    featureName: routing
+    ranges:
+      - path: src/flask/sansio/scaffold.py
+        startLine: 343
+        endLine: 373
+  - id: flask-feature-02
+    kind: feature
+    preset: explain_feature
+    featureName: JSON responses
+    ranges:
+      - path: src/flask/json/__init__.py
+        startLine: 138
+        endLine: 170
+  - id: flask-feature-03
+    kind: feature
+    preset: explain_feature
+    featureName: templates
+    ranges:
+      - path: src/flask/templating.py
+        startLine: 136
+        endLine: 148
+  - id: flask-out-01
+    kind: out_of_repo
+    question: What is the refund policy?
+    ranges: []
+  - id: flask-out-02
+    kind: out_of_repo
+    question: How do I book a conference room?
+    ranges: []
+  - id: flask-out-03
+    kind: out_of_repo
+    question: Which bank account receives invoices?
+    ranges: []

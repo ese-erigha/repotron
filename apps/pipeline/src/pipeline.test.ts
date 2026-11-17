@@ -59,25 +59,27 @@ describe('embedTexts', () => {
 describe('storeBatch', () => {
   it('when a batch is stored, then the recorded time is from before the upsert', async () => {
     let upsertStartedAt = 0
-    const context = {
-      config: { AI_GATEWAY_ID: 'gateway' },
-      batches: {
-        get: async () => ({
-          text: async () =>
-            '{"id":"9-abc:0","seq":0,"path":"src/a.ts","language":"typescript","symbol":null,"kind":"function","startLine":1,"endLine":2,"content":"const a = 1","header":"a","identifiers":"a"}',
-        }),
+    const context = batchContext({
+      text: chunkLine(0),
+      onUpsert: async () => {
+        upsertStartedAt = Date.now()
+        await setTimeout(30)
       },
-      repositories: { sourceChunks: { insertBatch: async () => undefined } },
-      ai: { run: async () => ({ data: [{ embedding: [0.1] }] }) },
-      vectors: {
-        upsert: async () => {
-          upsertStartedAt = Date.now()
-          await setTimeout(30)
-        },
-      },
-    } as unknown as PipelineContext
-    const recorded = await pipelineStorage.run(context, () => storeBatch('9-abc', 'batch-0.jsonl'))
+    })
+    const recorded = await pipelineStorage.run(context, () => storeBatch('9-abc', 'batch-0.jsonl', 1))
     assert.ok(Date.parse(recorded) <= upsertStartedAt)
+  })
+
+  it('when 12 chunks are stored, then the count is saved after each wave of 10', async () => {
+    const saved: number[] = []
+    const context = batchContext({
+      text: Array.from({ length: 12 }, (_, seq) => chunkLine(seq)).join('\n'),
+      onProgress: (chunkCount) => {
+        saved.push(chunkCount)
+      },
+    })
+    await pipelineStorage.run(context, () => storeBatch('9-abc', 'batch-0.jsonl', 12))
+    assert.deepEqual(saved, [10, 12])
   })
 })
 
@@ -150,6 +152,53 @@ async function embedNumberedTexts(count: number): Promise<{ maxActive: number; v
   } as unknown as PipelineContext
   const vectors = await pipelineStorage.run(context, () => embedTexts(texts))
   return { maxActive, vectors }
+}
+
+function chunkLine(seq: number): string {
+  return JSON.stringify({
+    id: `9-abc:${seq}`,
+    seq,
+    path: 'src/a.ts',
+    language: 'typescript',
+    symbol: null,
+    kind: 'function',
+    startLine: 1,
+    endLine: 2,
+    content: `const a = ${seq}`,
+    header: 'a',
+    identifiers: 'a',
+  })
+}
+
+function batchContext(input: {
+  text: string
+  onUpsert?: () => Promise<void>
+  onProgress?: (chunkCount: number) => void
+}): PipelineContext {
+  let stored = 0
+  return {
+    config: { AI_GATEWAY_ID: 'gateway' },
+    batches: { get: async () => ({ text: async () => input.text }) },
+    repositories: {
+      sourceChunks: {
+        insertBatch: async (rows: unknown[]) => {
+          stored += rows.length
+        },
+        countByIndex: async () => stored,
+      },
+      repositoryIndexes: {
+        recordChunkProgress: async (progress: { chunkCount: number }) => {
+          input.onProgress?.(progress.chunkCount)
+        },
+      },
+    },
+    ai: {
+      run: async (_model: string, body: { input: string[] }) => ({
+        data: body.input.map(() => ({ embedding: [0.1] })),
+      }),
+    },
+    vectors: { upsert: async () => input.onUpsert?.() },
+  } as unknown as PipelineContext
 }
 
 function vectorsContext(processedUpToDatetime: string): PipelineContext {

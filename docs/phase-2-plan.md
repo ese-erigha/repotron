@@ -72,7 +72,7 @@ The harness does not index a repository. A missing or unfinished index fails the
 These three commits are the set. A question names line ranges in that commit. A newer default-branch commit is a different index, and the golden file does not follow it.
 
 - `colinhacks/zod` at `90bf57b8e96a3729d766fff3185d39b2ab3ba016`. Staging already holds this index.
-- `honojs/hono` at `f6fbaf0299c48eea9e656e03e2ffe7ac755e8823`.
+- `honojs/hono` at `676c8f80fcafc49e6e74c847a8f0d9c44cc7faee`. This is the tip of `main`. The home page indexes that tip, not an older commit.
 - `pallets/flask` at `49943b5a94413a530761350f04e896f76e8d620e`.
 
 The index id is `<githubRepositoryId>-<commitSha>`. The golden file stores that id after the first ready index. The harness reads the id from the file. It does not compute it.
@@ -196,18 +196,33 @@ indexId: 245704608-90bf57b8e96a3729d766fff3185d39b2ab3ba016
 questions:
   - id: zod-identifier-01
     kind: identifier
-    question: Where is the object function defined?
+    question: Where is the object schema function defined?
     ranges:
-      - path: packages/zod/src/v3/types.ts
-        startLine: 1
-        endLine: 40
+      - path: packages/zod/src/v4/classic/schemas.ts
+        startLine: 1731
+        endLine: 1741
+  - id: zod-start-01
+    kind: start_here
+    preset: start_here
+    ranges:
+      - path: README.md
+        startLine: 39
+        endLine: 63
+  - id: zod-feature-01
+    kind: feature
+    preset: explain_feature
+    featureName: object schemas
+    ranges:
+      - path: packages/zod/src/v4/classic/schemas.ts
+        startLine: 1731
+        endLine: 1741
   - id: zod-out-01
     kind: out_of_repo
     question: What is the refund policy?
     ranges: []
 ```
 
-The paths and line numbers in this example are placeholders. Stage 2 replaces each range with lines that exist in the pinned commit. A range that does not exist in that commit is a defect in the golden file.
+`start_here` sends the preset and no free-text question. `feature` sends `explain_feature` and `featureName`. The other kinds send `question`. A range that does not exist in that commit is a defect in the golden file. The files in `apps/evals/golden/` hold the real ranges.
 
 `start_here` questions send the preset `start_here` and no free-text question. `feature` questions send the preset `explain_feature` and the feature name. The other kinds send `{ "question": "..." }`.
 

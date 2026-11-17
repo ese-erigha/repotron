@@ -1,13 +1,23 @@
-import { chunkSchema, formatChunkInput } from 'repotron-domain'
+import { chunkSchema, formatChunkInput, type Chunk } from 'repotron-domain'
 import type { NewSourceChunkRecord } from 'db'
 
 import { getBatches, getRepositories, getVectors } from '../context.ts'
-import { embedTexts } from '../embeddings.ts'
+import { EMBEDDING_WAVE_SIZE, embedTexts } from '../embeddings.ts'
+import { recordChunkProgress } from './index-status.ts'
 
-export async function storeBatch(indexId: string, key: string): Promise<string> {
+export async function storeBatch(indexId: string, key: string, chunkTotal: number): Promise<string> {
   const object = await getBatches().get(key)
   if (!object) throw new Error(`A chunk batch is missing. Key ${key}.`)
   const chunks = parseBatch(await object.text())
+  let upsertedAt = new Date(0).toISOString()
+  for (let start = 0; start < chunks.length; start += EMBEDDING_WAVE_SIZE) {
+    const wave = chunks.slice(start, start + EMBEDDING_WAVE_SIZE)
+    upsertedAt = await storeWave(indexId, wave, chunkTotal)
+  }
+  return upsertedAt
+}
+
+async function storeWave(indexId: string, chunks: Chunk[], chunkTotal: number): Promise<string> {
   const rows = chunks.map((chunk) => toChunkRow(indexId, chunk))
   await getRepositories().sourceChunks.insertBatch(rows)
   const vectors = await embedTexts(chunks.map((chunk) => formatChunkInput(chunk.header, chunk.content)))
@@ -15,6 +25,7 @@ export async function storeBatch(indexId: string, key: string): Promise<string> 
   // Vectorize stamps the mutation before this call returns. A later time stays ahead of that stamp.
   const upsertedAt = new Date().toISOString()
   await getVectors().upsert(upserts)
+  await recordChunkProgress(indexId, chunkTotal)
   return upsertedAt
 }
 

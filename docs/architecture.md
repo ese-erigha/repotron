@@ -100,11 +100,13 @@ The later phases read R2. They do not call the container.
 
 The pipeline Worker sets the status to `embedding` and stores the file count and the total chunk count. For each R2 file it runs one Workflow step. The next file starts only after that step finishes.
 
-1. Read the JSONL object from R2.
-2. Insert those chunks into `source_chunks`. One statement inserts one chunk. The row exists before the vector does.
-3. Embed the chunk text with Workers AI `@cf/google/embeddinggemma-2`. Each string is `title: <header> | text: <content>`. Each call sends one text. Ten calls run at the same time.
-4. Upsert the vectors into Vectorize. The namespace is the index id.
-5. Record the stored chunk count on the index row. The status card shows that count on its next poll.
+1. Read the JSONL object from R2. The object holds up to 500 chunks.
+2. Take the next 10 chunks.
+   - Insert those rows into `source_chunks`. One statement inserts one chunk. The row exists before the vector does.
+   - Embed the chunk text with Workers AI `@cf/google/embeddinggemma-2`. Each string is `title: <header> | text: <content>`. Each call sends one text. The 10 calls run at the same time.
+   - Upsert those vectors into Vectorize. The namespace is the index id.
+   - Record the stored chunk count on the index row. The status card shows that count on its next poll.
+3. Repeat until the object is done. The next object starts only after that.
 
 ### 5. Wait for the vectors — pipeline Worker
 
@@ -181,12 +183,10 @@ Hono. One controller for each route group. One use case for each action.
 4. Set the status to `embedding`, and store the file count and the total chunk count.
 5. For each batch key, run one step:
    - Read the JSONL batch from R2.
-   - Insert the chunks into `source_chunks` with one `db.batch()` call that holds one `INSERT … ON CONFLICT DO NOTHING` for each chunk. The row exists before the vector does.
-     - D1 allows 100 bound parameters and 100 KB in each statement. So one multi-row `INSERT` cannot hold 500 chunks.
-     - The 30-second query limit applies to the whole batch.
-   - Embed the chunk text with the embedding model. Each call sends one text. Ten calls run at the same time.
-   - Upsert the vectors into the namespace of the index.
-   - Record the stored chunk count on the index.
+   - For each wave of 10 chunks: insert the rows, embed them, upsert the vectors, then record the stored chunk count.
+     - Each insert is one `INSERT … ON CONFLICT DO NOTHING`. D1 allows 100 bound parameters and 100 KB in each statement.
+     - Each embedding call sends one text. The 10 calls run at the same time.
+     - The row exists before the vector does. A failed call leaves at most 10 rows with no vector, and the step retries the file.
 6. Wait for the vectors. Vectorize upserts are asynchronous. The step checks `processedUpToDatetime` from `describe()` against the time recorded immediately before the last upsert, and retries until Vectorize catches up.
 7. Set the status to `ready`, with the file count and the chunk count.
 8. Delete the batches in R2.

@@ -12,7 +12,6 @@ import {
   markFailed,
   markParsing,
   markReady,
-  recordChunkProgress,
 } from './index-status.ts'
 import { storeBatch } from './store-batch.ts'
 import { assertVectorsReady } from './wait-for-vectors.ts'
@@ -71,10 +70,7 @@ async function storeEveryBatch(
   let lastUpsertAt = new Date(0).toISOString()
   for (const [number, key] of parsed.batchKeys.entries()) {
     lastUpsertAt = await step.do(`store batch ${number}`, STEP, () =>
-      pipelineStorage.run(context, () => storeBatch(indexId, key)),
-    )
-    await step.do(`record chunk progress ${number}`, STEP, () =>
-      pipelineStorage.run(context, () => recordChunkProgress(indexId, parsed.chunkCount)),
+      pipelineStorage.run(context, () => storeBatch(indexId, key, parsed.chunkCount)),
     )
   }
   return lastUpsertAt
