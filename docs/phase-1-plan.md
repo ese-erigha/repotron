@@ -970,10 +970,12 @@ The job order below is the final shape.
 **Job order:**
 
 ```
-detect-changes → test → migrate (when SQL changed)
-                      → ensure-resources (every run)
+detect-changes → test → migrate (when SQL changed; otherwise this job is skipped)
+                      → ensure-resources
                             → deploy-pipeline → deploy-gateway → summary
 ```
+
+A failed migration skips the resource job and both deploys. A failed resource job skips both deploys. The summary still reports the failure.
 
 - **Trigger.** A push to `develop` that changes `apps/gateway`, `apps/pipeline`, `apps/indexer`, `packages`, `infra`, `scripts`, or the lockfile. Also `workflow_dispatch` with `apply_migrations`, `force_deploy_gateway`, and `force_deploy_pipeline`.
 - **detect-changes.** 3 outputs:

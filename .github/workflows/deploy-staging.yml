@@ -142,7 +142,11 @@ jobs:
   ensure-resources:
     runs-on: ubuntu-latest
     name: Ensure CI resources
-    needs: [test]
+    needs: [test, detect-changes, migrate]
+    if: |
+      always() &&
+      needs.test.result == 'success' &&
+      (needs.migrate.result == 'success' || needs.migrate.result == 'skipped')
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -160,11 +164,12 @@ jobs:
   deploy-pipeline:
     runs-on: ubuntu-latest
     name: Deploy pipeline
-    needs: [detect-changes, test, migrate]
+    needs: [detect-changes, test, migrate, ensure-resources]
     if: |
       always() &&
       needs.detect-changes.outputs.pipeline == 'true' &&
       needs.test.result == 'success' &&
+      needs.ensure-resources.result == 'success' &&
       (needs.migrate.result == 'success' || needs.migrate.result == 'skipped')
     steps:
       - uses: actions/checkout@v4
@@ -185,11 +190,12 @@ jobs:
   deploy-gateway:
     runs-on: ubuntu-latest
     name: Deploy gateway
-    needs: [detect-changes, test, migrate, deploy-pipeline]
+    needs: [detect-changes, test, migrate, ensure-resources, deploy-pipeline]
     if: |
       always() &&
       needs.detect-changes.outputs.gateway == 'true' &&
       needs.test.result == 'success' &&
+      needs.ensure-resources.result == 'success' &&
       (needs.migrate.result == 'success' || needs.migrate.result == 'skipped') &&
       (needs.deploy-pipeline.result == 'success' || needs.deploy-pipeline.result == 'skipped')
     steps:
