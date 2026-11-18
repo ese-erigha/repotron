@@ -242,6 +242,8 @@ These are targets. Measure them on staging.
 
 ### Phase 3: Hybrid retrieval
 
+[phase-3-plan.md](phase-3-plan.md) holds the delivery stages.
+
 - [ ] Add the FTS5 table and BM25 search.
 - [ ] Add RRF.
 - [ ] Add the reranker.

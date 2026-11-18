@@ -79,6 +79,7 @@ def main() -> None:
         "questions": records,
     }
     (ROOT / "report.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    print(json.dumps({"identifierHitAt1": retrieval.identifier_hit_at_1}, indent=2))
     _finish(scores)
 
 

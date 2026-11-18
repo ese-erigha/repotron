@@ -31,7 +31,7 @@ This plan turns Phase 2 of [prd.md](prd.md) into work that one implementer can d
 
 **Out of scope.**
 
-- BM25, RRF, the reranker, scope filters, confidence labels, and the symbol trace (Phase 3)
+- BM25, RRF, the reranker, scope filters, confidence labels, and the symbol trace (Phase 3). [phase-3-plan.md](phase-3-plan.md) holds that work.
 - The public dashboard and storing reports in R2 (Phase 4)
 - A change to chunking, the embedding model, or `CONTEXT_CHUNKS`
 - A new screen. The web app stays as it is.

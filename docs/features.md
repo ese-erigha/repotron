@@ -45,6 +45,8 @@ This file lists each feature, its phase, and the check that proves it on staging
 
 ## 4. Phase 3: Hybrid retrieval
 
+[phase-3-plan.md](phase-3-plan.md) holds the delivery stages.
+
 - **F-12: BM25 search.** An FTS5 table over the chunk text and the split identifiers. `getUserById` also matches `get user by id`.
 - **F-13: RRF fusion.** The dense list and the BM25 list merge by reciprocal rank, with `k` = 60.
 - **F-14: Rerank.** A cross-encoder scores the top 50 fused chunks. The top 8 go to the model.
