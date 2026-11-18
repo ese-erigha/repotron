@@ -38,8 +38,34 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm turbo run lint
 
+  changes:
+    runs-on: ubuntu-latest
+    name: Detect score paths
+    outputs:
+      score: ${{ steps.gate.outputs.score }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'workflow_dispatch' && 'develop' || github.sha }}
+      - name: Decide whether to score
+        id: gate
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "score=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          files=$(git diff --name-only "${{ github.event.pull_request.base.sha }}" HEAD)
+          echo "$files"
+          if echo "$files" | grep -qE '^(apps/gateway/|apps/evals/|packages/domain/|packages/db/|\.github/workflows/eval\.yml$)'; then
+            echo "score=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "score=false" >> "$GITHUB_OUTPUT"
+          fi
+
   eval:
-    needs: [lint]
+    needs: [lint, changes]
+    if: needs.changes.outputs.score == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     defaults:
