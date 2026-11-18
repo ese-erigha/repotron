@@ -307,7 +307,7 @@ Add `EVAL_TOKEN` to the gateway env schema with the other required secrets. No s
   - It runs on a pull request to `develop` and on `workflow_dispatch`.
   - A pull request scores the 30 questions only when the diff touches `apps/gateway`, `packages/domain`, or `packages/db`. Lint still runs.
   - `workflow_dispatch` always scores the 30 questions against the public staging URL.
-  - A pull request uploads an unpromoted version of `repotron-staging-gateway` and scores that preview URL. The live staging URL stays on the last merge.
+  - A pull request deploys `repotron-pr-<number>-gateway` and scores that URL. The rate limiter stays on `repotron-staging-gateway`. Closing the pull request deletes the preview Worker. The live staging URL stays on the last merge.
   - A pull request that adds a SQL file fails before the upload. The message says a schema change is scored after the merge.
   - It does not deploy the pipeline or the web Worker, and it does not apply a migration.
   - The job timeout is 60 minutes. The harness asks one question at a time.
