@@ -168,7 +168,7 @@ await indexes.insertQueued(row)
 ## Repo policy
 
 - **Do not commit or push** unless the user asks in that message.
-- **Do not deploy.** A push to `develop` deploys. `deploy-staging.yml` covers the gateway and the pipeline. `deploy-web.yml` covers the web Worker, and it runs only when web paths change. Forbidden unless they ask: `cf deploy` without `--dry-run`, `wrangler deploy`, `git push`.
+- **Do not deploy.** A push to `develop` deploys. `deploy-staging.yml` covers the gateway and the pipeline. `deploy-web.yml` covers the web Worker, and it runs only when web paths change. A pull request eval uploads an unpromoted gateway version with `cf workers versions create`. That upload does not replace the live staging URL. Forbidden unless they ask: `cf deploy` without `--dry-run`, `wrangler deploy`, `git push`.
 - **Do not mutate remote Cloudflare data.** Forbidden unless they ask: remote D1 writes, Vectorize writes, R2 writes, and secret puts.
 - **No local infrastructure.** Every test of D1, Vectorize, R2, Workers AI, a Workflow, or the Container runs on staging. Do not run `cf dev` or a `--local` command.
 - Remote read-only checks are fine when the answer needs them. Prefer the code and the docs first.

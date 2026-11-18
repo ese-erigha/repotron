@@ -306,11 +306,12 @@ Add `EVAL_TOKEN` to the gateway env schema with the other required secrets. No s
 - Add `.github/workflows/eval.yml`.
   - It runs on a pull request to `develop` and on `workflow_dispatch`.
   - A pull request scores the 30 questions only when the diff touches `apps/gateway`, `apps/evals`, `packages/domain`, `packages/db`, or `.github/workflows/eval.yml`. Lint still runs.
-  - `workflow_dispatch` always scores the 30 questions.
-  - It checks out the code, installs uv, and runs the eval package.
-  - It does not deploy and it does not apply a migration.
+  - `workflow_dispatch` always scores the 30 questions against the public staging URL.
+  - A pull request uploads an unpromoted version of `repotron-staging-gateway` and scores that preview URL. The live staging URL stays on the last merge.
+  - A pull request that adds a SQL file fails before the upload. The message says a schema change is scored after the merge.
+  - It does not deploy the pipeline or the web Worker, and it does not apply a migration.
   - The job timeout is 60 minutes. The harness asks one question at a time.
-- GitHub Actions secrets for this workflow: `EVAL_TOKEN`, `OPENROUTER_API_KEY`, `CF_AIG_TOKEN`, and `CLOUDFLARE_ACCOUNT_ID`. The gateway URL is the public staging URL. The workflow does not print the secrets.
+- GitHub Actions secrets for this workflow: `EVAL_TOKEN`, `OPENROUTER_API_KEY`, `CF_AIG_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, and `CLOUDFLARE_API_TOKEN`. The workflow does not print the secrets.
 - **Proof:** open a pull request that sets `CONTEXT_CHUNKS` to 1. The eval check fails. Close that pull request without merging. The proof matches the check in [features.md](features.md), section 6, step 6.
 
 ---

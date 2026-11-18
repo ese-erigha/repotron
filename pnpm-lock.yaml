@@ -21,6 +21,8 @@ importers:
         specifier: ^2.6.1
         version: 2.11.11
 
+  apps/evals: {}
+
   apps/gateway:
     dependencies:
       db:

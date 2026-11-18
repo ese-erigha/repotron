@@ -41,7 +41,7 @@ This file lists each feature, its phase, and the check that proves it on staging
   - The question kinds are identifier, concept, architecture, start-here, feature, and out-of-repository.
   - Each answerable question has ground-truth line ranges.
 - **F-10: RAG triad report.** Context recall and precision, faithfulness, answer relevance, citation accuracy, refusal accuracy, p95 latency, and cost.
-- **F-11: CI gate.** A pull request runs the 30 questions when it changes the gateway, the question settings, the database package, or the eval harness. The check fails on a drop of more than 2 percentage points. A manual run always asks the 30.
+- **F-11: CI gate.** A pull request runs the 30 questions against a preview of that pull request's gateway when it changes the gateway, the question settings, the database package, or the eval harness. The check fails on a drop of more than 2 percentage points. A manual run always asks the 30 against the public staging URL.
 
 ## 4. Phase 3: Hybrid retrieval
 
