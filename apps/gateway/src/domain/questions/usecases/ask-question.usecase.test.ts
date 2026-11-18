@@ -30,7 +30,13 @@ describe('askQuestion', () => {
   it('when the eval token matches, then the question does not call the rate limit', async () => {
     const calls = { n: 0 }
     const stream = await gatewayStorage.run(context({ calls, allowed: true }), () =>
-      askQuestion({ indexId: '9-abc', body: { question: 'Where?' }, remoteIp: '203.0.113.5', evalToken: 'eval-token' }),
+      askQuestion({
+        indexId: '9-abc',
+        body: { question: 'Where?' },
+        remoteIp: '203.0.113.5',
+        evalToken: 'eval-token',
+        retrieval: '',
+      }),
     )
     await new Response(stream).text()
     assert.equal(calls.n, 0)
@@ -41,15 +47,55 @@ describe('askQuestion', () => {
     await assert.rejects(
       () =>
         gatewayStorage.run(context({ calls, allowed: false }), () =>
-          askQuestion({ indexId: '9-abc', body: { question: 'Where?' }, remoteIp: '203.0.113.5', evalToken: '' }),
+          askQuestion({
+            indexId: '9-abc',
+            body: { question: 'Where?' },
+            remoteIp: '203.0.113.5',
+            evalToken: '',
+            retrieval: 'bm25',
+          }),
         ),
       (error: unknown) => error instanceof RequestError && error.status === 429,
     )
     assert.equal(calls.n, 1)
   })
+
+  it('when the eval token matches and retrieval is bm25, then the keyword query binds the index id', async () => {
+    const keyword = { indexId: '', match: '' }
+    let vectorQueries = 0
+    const stream = await gatewayStorage.run(
+      context({
+        calls: { n: 0 },
+        allowed: true,
+        keyword,
+        onVectorQuery: () => {
+          vectorQueries += 1
+        },
+      }),
+      () =>
+        askQuestion({
+          indexId: '9-abc',
+          body: { question: 'Where is getUserById?' },
+          remoteIp: '203.0.113.5',
+          evalToken: 'eval-token',
+          retrieval: 'bm25',
+        }),
+    )
+    await new Response(stream).text()
+
+    assert.equal(keyword.indexId, '9-abc')
+    assert.equal(keyword.match.includes('9-abc'), false)
+    assert.equal(keyword.match.includes('"getUserById"'), true)
+    assert.equal(vectorQueries, 0)
+  })
 })
 
-function context(input: { calls: { n: number }; allowed: boolean }): GatewayContext {
+function context(input: {
+  calls: { n: number }
+  allowed: boolean
+  keyword?: { indexId: string; match: string }
+  onVectorQuery?: () => void
+}): GatewayContext {
   return {
     config,
     repositories: {
@@ -58,10 +104,24 @@ function context(input: { calls: { n: number }; allowed: boolean }): GatewayCont
         recordQuestion: async () => undefined,
       },
       githubRepositories: { get: async () => ({ id: '9', owner: 'owner', name: 'repo' }) },
-      sourceChunks: { listByIds: async () => [] },
+      sourceChunks: {
+        listByIds: async () => [],
+        listIdsByKeyword: async (query: { indexId: string; match: string }) => {
+          if (input.keyword) {
+            input.keyword.indexId = query.indexId
+            input.keyword.match = query.match
+          }
+          return []
+        },
+      },
       answeredQuestions: { insert: async () => undefined },
     },
-    vectors: { query: async () => ({ matches: [] }) },
+    vectors: {
+      query: async () => {
+        input.onVectorQuery?.()
+        return { matches: [] }
+      },
+    },
     ai: { run: async () => ({ data: [{ embedding: [0.1] }] }) },
     rateLimiter: {
       getByName: () => ({

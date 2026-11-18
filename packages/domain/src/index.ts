@@ -19,6 +19,7 @@ export type {
 export {
   CHUNK_BATCH_SIZE,
   CONTEXT_CHUNKS,
+  RETRIEVAL_TOP_K,
   DELETE_PAGE_SIZE,
   EMBED_BATCH_SIZE,
   EMBED_CONCURRENCY,
@@ -51,6 +52,7 @@ export {
 export { buildChunkId, buildGithubLineUrl, buildIndexId, parseRepositoryLink } from './links.ts'
 export type { GithubLineLink, RepositoryLink } from './links.ts'
 export { formatChunkInput, formatQueryInput } from './formats.ts'
+export { RETRIEVAL_MODE, keywordMatch } from './keywords.ts'
 export { readCitedNumbers } from './citations.ts'
 export {
   chunkKindSchema,
