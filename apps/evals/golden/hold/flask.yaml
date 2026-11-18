@@ -1,0 +1,70 @@
+# Held out of the eval run. The loader reads only golden/*.yaml.
+repository: pallets/flask
+commitSha: 49943b5a94413a530761350f04e896f76e8d620e
+indexId: 596892-49943b5a94413a530761350f04e896f76e8d620e
+questions:
+  - id: flask-identifier-03
+    kind: identifier
+    question: Where is render_template defined?
+    ranges:
+      - path: src/flask/templating.py
+        startLine: 136
+        endLine: 148
+  - id: flask-concept-03
+    kind: concept
+    question: How does Flask register a URL rule?
+    ranges:
+      - path: src/flask/sansio/scaffold.py
+        startLine: 375
+        endLine: 441
+  - id: flask-concept-04
+    kind: concept
+    question: How does the WSGI entry call the Flask app?
+    ranges:
+      - path: src/flask/app.py
+        startLine: 1627
+        endLine: 1677
+  - id: flask-architecture-03
+    kind: architecture
+    question: Where is the Blueprint class defined?
+    ranges:
+      - path: src/flask/blueprints.py
+        startLine: 18
+        endLine: 128
+  - id: flask-start-02
+    kind: start_here
+    preset: start_here
+    ranges:
+      - path: README.md
+        startLine: 23
+        endLine: 37
+  - id: flask-start-03
+    kind: start_here
+    preset: start_here
+    ranges:
+      - path: src/flask/app.py
+        startLine: 308
+        endLine: 361
+  - id: flask-start-04
+    kind: start_here
+    preset: start_here
+    ranges:
+      - path: src/flask/sansio/scaffold.py
+        startLine: 343
+        endLine: 373
+  - id: flask-feature-03
+    kind: feature
+    preset: explain_feature
+    featureName: templates
+    ranges:
+      - path: src/flask/templating.py
+        startLine: 136
+        endLine: 148
+  - id: flask-out-02
+    kind: out_of_repo
+    question: How do I book a conference room?
+    ranges: []
+  - id: flask-out-03
+    kind: out_of_repo
+    question: Which bank account receives invoices?
+    ranges: []

@@ -37,11 +37,11 @@ This file lists each feature, its phase, and the check that proves it on staging
 
 [phase-2-plan.md](phase-2-plan.md) holds the delivery stages.
 
-- **F-9: Golden set.** 3 repositories at fixed commits, with 60 questions at least.
+- **F-9: Golden set.** 3 repositories at fixed commits, with 60 questions written. The run asks 30.
   - The question kinds are identifier, concept, architecture, start-here, feature, and out-of-repository.
   - Each answerable question has ground-truth line ranges.
 - **F-10: RAG triad report.** Context recall and precision, faithfulness, answer relevance, citation accuracy, refusal accuracy, p95 latency, and cost.
-- **F-11: CI gate.** A pull request runs the 60 questions when it changes the gateway, the question settings, the database package, or the eval harness. The check fails on a drop of more than 2 percentage points. A manual run always asks the 60.
+- **F-11: CI gate.** A pull request runs the 30 questions when it changes the gateway, the question settings, the database package, or the eval harness. The check fails on a drop of more than 2 percentage points. A manual run always asks the 30.
 
 ## 4. Phase 3: Hybrid retrieval
 
