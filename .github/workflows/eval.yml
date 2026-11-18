@@ -2,6 +2,11 @@ name: Eval
 
 on:
   pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - closed
     branches:
       - develop
   workflow_dispatch:
@@ -21,6 +26,7 @@ permissions:
 
 jobs:
   lint:
+    if: github.event.action != 'closed'
     runs-on: ubuntu-latest
     name: Lint
     steps:
@@ -39,6 +45,7 @@ jobs:
       - run: pnpm turbo run lint
 
   changes:
+    if: github.event.action != 'closed'
     runs-on: ubuntu-latest
     name: Detect score paths
     outputs:
@@ -86,7 +93,7 @@ jobs:
 
   preview:
     needs: [lint, changes]
-    if: github.event_name == 'pull_request' && needs.changes.outputs.score == 'true' && needs.changes.outputs.migrations != 'true'
+    if: github.event.action != 'closed' && github.event_name == 'pull_request' && needs.changes.outputs.score == 'true' && needs.changes.outputs.migrations != 'true'
     runs-on: ubuntu-latest
     name: Upload the gateway preview
     outputs:
@@ -102,23 +109,63 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm turbo run build --filter=gateway...
-      - name: Upload an unpromoted gateway version
+      - name: Deploy the pull request gateway
         id: preview
         working-directory: apps/gateway
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          TURNSTILE_SECRET: ${{ secrets.TURNSTILE_SECRET }}
+          GATEWAY_GITHUB_TOKEN: ${{ secrets.GATEWAY_GITHUB_TOKEN }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          CF_AIG_TOKEN: ${{ secrets.CF_AIG_TOKEN }}
+          EVAL_TOKEN: ${{ secrets.EVAL_TOKEN }}
         run: |
-          alias_name="pr-${{ github.event.pull_request.number }}"
-          worker_name="repotron-staging-gateway"
-          host="ese-erigha.workers.dev"
-          label="${alias_name}-${worker_name}"
-          if [ "${#label}" -gt 63 ]; then
+          worker_name="repotron-pr-${{ github.event.pull_request.number }}-gateway"
+          if [ "${#worker_name}" -gt 63 ]; then
             echo "The preview name is longer than 63 characters."
             exit 1
           fi
-          pnpm exec cf workers versions create --preview-alias "$alias_name" --message "${{ github.sha }}"
-          origin="https://${label}.${host}"
+          for secret_name in TURNSTILE_SECRET GATEWAY_GITHUB_TOKEN OPENROUTER_API_KEY CF_AIG_TOKEN EVAL_TOKEN; do
+            secret_value=$(printenv "$secret_name" || true)
+            if [ -z "$secret_value" ]; then
+              echo "The GitHub secret ${secret_name} is missing."
+              exit 1
+            fi
+          done
+          export PREVIEW_WORKER="$worker_name"
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          path = Path("cloudflare.config.ts")
+          text = path.read_text()
+          old = "    name: 'repotron-staging-gateway',"
+          new = f"    name: '{os.environ['PREVIEW_WORKER']}',"
+          if old not in text:
+              raise SystemExit("The gateway name line was not found.")
+          path.write_text(text.replace(old, new, 1))
+          PY
+          jq -n \
+            --arg turnstile "$TURNSTILE_SECRET" \
+            --arg github "$GATEWAY_GITHUB_TOKEN" \
+            --arg openrouter "$OPENROUTER_API_KEY" \
+            --arg aig "$CF_AIG_TOKEN" \
+            --arg eval "$EVAL_TOKEN" \
+            '{TURNSTILE_SECRET:$turnstile, GITHUB_TOKEN:$github, OPENROUTER_API_KEY:$openrouter, CF_AIG_TOKEN:$aig, EVAL_TOKEN:$eval}' \
+            > "$RUNNER_TEMP/gateway-secrets.json"
+          attempt=1
+          while [ "$attempt" -le 3 ]; do
+            if pnpm exec cf deploy --force --message "${{ github.sha }}" --secrets-file "$RUNNER_TEMP/gateway-secrets.json"; then
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              exit 1
+            fi
+            sleep 15
+            attempt=$((attempt + 1))
+          done
+          rm -f "$RUNNER_TEMP/gateway-secrets.json"
+          origin="https://${worker_name}.ese-erigha.workers.dev"
           attempt=1
           while [ "$attempt" -le 6 ]; do
             if curl -fsS "${origin}/health"; then
@@ -175,3 +222,28 @@ jobs:
           git commit -m "Add the eval baseline"
           git push --force-with-lease -u origin eval-baseline
           gh pr create --base develop --head eval-baseline --title "Add the eval baseline" --body "Scores from the Eval workflow. Merge this pull request so later pull requests can compare against it." || gh pr view eval-baseline --json url --jq .url
+
+  delete-preview:
+    if: github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    name: Delete the pull request gateway
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Delete the preview Worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          worker_name="repotron-pr-${{ github.event.pull_request.number }}-gateway"
+          if output=$(pnpm exec cf workers delete "$worker_name" --force 2>&1); then
+            printf '%s\n' "$output"
+            exit 0
+          fi
+          printf '%s\n' "$output"
+          printf '%s\n' "$output" | grep -qi "not found"

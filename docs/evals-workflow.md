@@ -9,12 +9,12 @@ This file is the plan for steps 2 and 3. [phase-2-plan.md](phase-2-plan.md) owns
 On each pull request to `develop`, and on each new push to that pull request, `eval.yml` does this when the score paths changed:
 
 1. Fail the job when the pull request adds a file under `infra/migrations`. The message says a schema change is scored after the merge.
-2. From `apps/gateway`, run `cf workers versions create --preview-alias pr-<number>`. This uploads a version of `repotron-staging-gateway` and leaves the live URL on the last merge.
-3. Set `EVAL_GATEWAY_ORIGIN` to `https://pr-<number>-repotron-staging-gateway.ese-erigha.workers.dev`.
+2. In the GitHub checkout only, set the Worker name to `repotron-pr-<number>-gateway`. The committed config stays `repotron-staging-gateway`. The rate-limiter binding stays pointed at `repotron-staging-gateway`.
+3. Deploy that Worker with `cf deploy` and the gateway secrets. Set `EVAL_GATEWAY_ORIGIN` to `https://repotron-pr-<number>-gateway.ese-erigha.workers.dev`. Delete that Worker when the pull request closes.
 4. Ask the 30 questions, one at a time, with the eval token.
 5. Compare the six scores with `baseline.json`. Exit 1 when any score drops by more than 0.02.
 
-The preview uses the bindings in `apps/gateway/cloudflare.config.ts` and the secrets already on that Worker. A manual run does not upload a version. It calls the public staging URL.
+The preview uses the staging database, the staging vector index, and the staging rate limiter. A new Worker does not inherit secrets, so the deploy sends them. A manual run does not deploy a preview. It calls the public staging URL.
 
 Do not do these things in this job:
 
@@ -39,4 +39,4 @@ After the check is required:
 2. Confirm the Eval check fails.
 3. Close that pull request. Do not merge it.
 
-A merge to `develop` still deploys staging through `deploy-staging.yml`. The preview exists only for the eval. An unpromoted version needs no delete.
+A merge to `develop` still deploys staging through `deploy-staging.yml`. The preview Worker exists only for the eval. Closing the pull request deletes `repotron-pr-<number>-gateway`.
