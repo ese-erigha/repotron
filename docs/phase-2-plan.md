@@ -300,12 +300,12 @@ Add `EVAL_TOKEN` to the gateway env schema with the other required secrets. No s
 
 ### Stage 5: Turn on the gate
 
-**Status.** `.github/workflows/eval.yml` runs on a pull request and compares `baseline.json`. The 30 questions run only when that pull request changes `apps/gateway`, `apps/evals`, `packages/domain`, `packages/db`, or the workflow file. Any other pull request lints and skips the score. A manual run with "Write baseline" always asks the 30 questions and opens a pull request that adds `baseline.json`. The proof pull request that sets `CONTEXT_CHUNKS` to 1 is still open work, and it must not be merged.
+**Status.** `.github/workflows/eval.yml` runs on a pull request and compares `baseline.json`. The 30 questions run only when that pull request changes `apps/gateway`, `packages/domain`, or `packages/db`. Any other pull request lints and skips the score. A manual run with "Write baseline" always asks the 30 questions and opens a pull request that adds `baseline.json`. The proof pull request that sets `CONTEXT_CHUNKS` to 1 is still open work, and it must not be merged.
 
 - Copy the quality scores from the stage 4 report into `baseline.json` and commit that file.
 - Add `.github/workflows/eval.yml`.
   - It runs on a pull request to `develop` and on `workflow_dispatch`.
-  - A pull request scores the 30 questions only when the diff touches `apps/gateway`, `apps/evals`, `packages/domain`, `packages/db`, or `.github/workflows/eval.yml`. Lint still runs.
+  - A pull request scores the 30 questions only when the diff touches `apps/gateway`, `packages/domain`, or `packages/db`. Lint still runs.
   - `workflow_dispatch` always scores the 30 questions against the public staging URL.
   - A pull request uploads an unpromoted version of `repotron-staging-gateway` and scores that preview URL. The live staging URL stays on the last merge.
   - A pull request that adds a SQL file fails before the upload. The message says a schema change is scored after the merge.

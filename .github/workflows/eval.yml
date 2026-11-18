@@ -59,7 +59,7 @@ jobs:
           fi
           files=$(git diff --name-only "${{ github.event.pull_request.base.sha }}" HEAD)
           echo "$files"
-          if echo "$files" | grep -qE '^(apps/gateway/|apps/evals/|packages/domain/|packages/db/|\.github/workflows/eval\.yml$)'; then
+          if echo "$files" | grep -qE '^(apps/gateway/|packages/domain/|packages/db/)'; then
             echo "score=true" >> "$GITHUB_OUTPUT"
           else
             echo "score=false" >> "$GITHUB_OUTPUT"
