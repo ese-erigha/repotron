@@ -27,7 +27,7 @@ A pull request that only changes parsing or embedding is not visible to this eva
 
 The job timeout stays 60 minutes. One run is 30 answers plus the judge.
 
-The score runs when the pull request changes `apps/gateway`, `apps/evals`, `packages/domain`, `packages/db`, or `.github/workflows/eval.yml`. Any other pull request lints and skips the score. A manual run always asks the 30 questions.
+The score runs when the pull request changes `apps/gateway`, `packages/domain`, or `packages/db`. A change to the eval harness, the workflow, or the docs lints and skips the preview and the 30 questions. A manual run always asks the 30 questions.
 
 ## Step 3: Block the merge
 
