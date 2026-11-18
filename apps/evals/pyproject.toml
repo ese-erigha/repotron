@@ -13,10 +13,10 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-only-include = ["evals"]
+packages = ["src/evals"]
 
 [tool.hatch.build.targets.wheel.sources]
-"src" = ""
+"src/evals" = "evals"
 
 [dependency-groups]
 dev = [
