@@ -33,6 +33,19 @@ def ask_question(
     body: dict[str, str],
     token: str,
 ) -> AnswerResult:
+    try:
+        return _post_question(client, origin, index_id, body, token)
+    except httpx.HTTPError:
+        return _post_question(client, origin, index_id, body, token)
+
+
+def _post_question(
+    client: httpx.Client,
+    origin: str,
+    index_id: str,
+    body: dict[str, str],
+    token: str,
+) -> AnswerResult:
     response = client.post(
         f"{origin}/api/v1/indexes/{index_id}/questions",
         params={"debug": "true"},

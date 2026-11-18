@@ -16,13 +16,6 @@ questions:
       - path: src/hono-base.ts
         startLine: 144
         endLine: 193
-  - id: hono-identifier-03
-    kind: identifier
-    question: Where is the route method defined?
-    ranges:
-      - path: src/hono-base.ts
-        startLine: 228
-        endLine: 252
   - id: hono-concept-01
     kind: concept
     question: How does Hono mount another app on a path?
@@ -37,13 +30,6 @@ questions:
       - path: src/hono-base.ts
         startLine: 425
         endLine: 485
-  - id: hono-concept-03
-    kind: concept
-    question: How does a Context expose the request?
-    ranges:
-      - path: src/context.ts
-        startLine: 366
-        endLine: 369
   - id: hono-architecture-01
     kind: architecture
     question: How do I start a Hono app?
@@ -58,20 +44,6 @@ questions:
       - path: README.md
         startLine: 40
         endLine: 47
-  - id: hono-architecture-03
-    kind: architecture
-    question: Where is the public Hono class exported?
-    ranges:
-      - path: src/hono.ts
-        startLine: 16
-        endLine: 34
-  - id: hono-architecture-04
-    kind: architecture
-    question: Where does Hono register a route on a base path?
-    ranges:
-      - path: src/hono-base.ts
-        startLine: 228
-        endLine: 252
   - id: hono-start-01
     kind: start_here
     preset: start_here
@@ -79,20 +51,6 @@ questions:
       - path: README.md
         startLine: 34
         endLine: 39
-  - id: hono-start-02
-    kind: start_here
-    preset: start_here
-    ranges:
-      - path: README.md
-        startLine: 40
-        endLine: 47
-  - id: hono-start-03
-    kind: start_here
-    preset: start_here
-    ranges:
-      - path: src/hono.ts
-        startLine: 16
-        endLine: 34
   - id: hono-feature-01
     kind: feature
     preset: explain_feature
@@ -109,31 +67,7 @@ questions:
       - path: src/hono-base.ts
         startLine: 352
         endLine: 403
-  - id: hono-feature-03
-    kind: feature
-    preset: explain_feature
-    featureName: request context
-    ranges:
-      - path: src/context.ts
-        startLine: 366
-        endLine: 369
-  - id: hono-feature-04
-    kind: feature
-    preset: explain_feature
-    featureName: error handling
-    ranges:
-      - path: src/hono-base.ts
-        startLine: 418
-        endLine: 423
   - id: hono-out-01
     kind: out_of_repo
     question: What is the employee vacation policy?
-    ranges: []
-  - id: hono-out-02
-    kind: out_of_repo
-    question: How do I file an expense report?
-    ranges: []
-  - id: hono-out-03
-    kind: out_of_repo
-    question: Who is the payroll vendor?
     ranges: []

@@ -1,0 +1,67 @@
+# Held out of the eval run. The loader reads only golden/*.yaml.
+repository: colinhacks/zod
+commitSha: 90bf57b8e96a3729d766fff3185d39b2ab3ba016
+indexId: 245704608-90bf57b8e96a3729d766fff3185d39b2ab3ba016
+questions:
+  - id: zod-identifier-03
+    kind: identifier
+    question: Where is discriminatedUnion defined?
+    ranges:
+      - path: packages/zod/src/v4/classic/schemas.ts
+        startLine: 1843
+        endLine: 1858
+  - id: zod-identifier-04
+    kind: identifier
+    question: Where is the optional schema function defined?
+    ranges:
+      - path: packages/zod/src/v4/classic/schemas.ts
+        startLine: 2321
+        endLine: 2326
+  - id: zod-concept-03
+    kind: concept
+    question: How does Zod mark a schema as nullable?
+    ranges:
+      - path: packages/zod/src/v4/classic/schemas.ts
+        startLine: 2371
+        endLine: 2376
+  - id: zod-architecture-03
+    kind: architecture
+    question: Where does the readme show a basic parse?
+    ranges:
+      - path: README.md
+        startLine: 85
+        endLine: 97
+  - id: zod-start-02
+    kind: start_here
+    preset: start_here
+    ranges:
+      - path: README.md
+        startLine: 77
+        endLine: 84
+  - id: zod-start-03
+    kind: start_here
+    preset: start_here
+    ranges:
+      - path: README.md
+        startLine: 85
+        endLine: 97
+  - id: zod-feature-03
+    kind: feature
+    preset: explain_feature
+    featureName: discriminated unions
+    ranges:
+      - path: packages/zod/src/v4/classic/schemas.ts
+        startLine: 1843
+        endLine: 1858
+  - id: zod-out-02
+    kind: out_of_repo
+    question: How do I reset my billing password?
+    ranges: []
+  - id: zod-out-03
+    kind: out_of_repo
+    question: Which office handles payroll?
+    ranges: []
+  - id: zod-out-04
+    kind: out_of_repo
+    question: What is the company holiday calendar?
+    ranges: []

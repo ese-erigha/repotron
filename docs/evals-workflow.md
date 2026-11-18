@@ -13,7 +13,7 @@ On each pull request to `develop`, and on each new push to that pull request:
 1. Deploy that commit's gateway only.
 2. Bind the preview to the staging database `repotron-staging-db` and the staging vector index `repotron-staging-chunks`. Those already hold the three golden indexes.
 3. Set `EVAL_GATEWAY_ORIGIN` to the preview URL.
-4. Ask the 60 questions, one at a time, with the eval token.
+4. Ask the 30 questions, one at a time, with the eval token.
 5. Compare the six scores with `baseline.json`. Exit 1 when any score drops by more than 0.02.
 
 Leave the live staging URL on the last merge. Prefer an unpromoted version of `repotron-staging-gateway`. That version keeps the Worker secrets that staging already has. If the CLI cannot upload a version without promoting it, deploy a Worker named `repotron-pr-<number>-gateway`, copy the same secrets onto it, and delete that Worker when the pull request closes.
@@ -29,9 +29,9 @@ When the pull request adds a file under `infra/migrations`, fail the job and say
 
 A pull request that only changes parsing or embedding is not visible to this eval. The questions read indexes that are already built. Say that in the job log. Do not re-index inside the pull request.
 
-The job timeout stays 60 minutes. One run is 60 answers plus the judge.
+The job timeout stays 60 minutes. One run is 30 answers plus the judge.
 
-The score runs when the pull request changes `apps/gateway`, `apps/evals`, `packages/domain`, `packages/db`, or `.github/workflows/eval.yml`. Any other pull request lints and skips the score. A manual run always asks the 60 questions.
+The score runs when the pull request changes `apps/gateway`, `apps/evals`, `packages/domain`, `packages/db`, or `.github/workflows/eval.yml`. Any other pull request lints and skips the score. A manual run always asks the 30 questions.
 
 ## Step 3: Block the merge
 
