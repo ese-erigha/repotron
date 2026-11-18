@@ -1,0 +1,11 @@
+{
+  "name": "evals",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "build": "node -e \"require('node:fs').mkdirSync('dist',{recursive:true})\"",
+    "lint": "uv run ruff check . && uv run ruff format --check .",
+    "typecheck": "uv run mypy --strict src",
+    "test": "uv run pytest"
+  }
+}
