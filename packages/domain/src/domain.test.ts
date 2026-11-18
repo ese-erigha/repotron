@@ -4,6 +4,7 @@ import { describe, it } from 'node:test'
 
 import { buildContract } from './contract.ts'
 import { formatChunkInput, formatQueryInput } from './formats.ts'
+import { keywordMatch } from './keywords.ts'
 import { buildGithubLineUrl, parseRepositoryLink } from './links.ts'
 import { readCitedNumbers } from './citations.ts'
 
@@ -24,6 +25,19 @@ describe('parseRepositoryLink', () => {
 describe('formatChunkInput', () => {
   it('when a chunk has a header and content, then the input uses the title and text form', () => {
     assert.equal(formatChunkInput('src/app.py App', 'class App:'), 'title: src/app.py App | text: class App:')
+  })
+})
+
+describe('keywordMatch', () => {
+  it('when the question names getUserById, then the match text quotes the split parts', () => {
+    const match = keywordMatch('Where is getUserById defined?')
+
+    assert.equal(match.includes('"getUserById"'), true)
+    assert.equal(match.includes('"get"'), true)
+    assert.equal(match.includes('"user"'), true)
+    assert.equal(match.includes('"by"'), true)
+    assert.equal(match.includes('"id"'), true)
+    assert.equal(match.includes('9-abc'), false)
   })
 })
 

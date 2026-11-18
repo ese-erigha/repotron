@@ -190,6 +190,8 @@ The production path stays dense.
 
 ### Stage 3: Add BM25 behind the eval flag
 
+**Status.** `retrieval=bm25` runs the keyword query only when the eval token matches. A normal question still uses vector search. The staging check is one identifier question with that flag.
+
 The production path stays dense.
 
 - Add a repository method that runs one BM25 query for an index id and a term list. The limit is 50.

@@ -1,4 +1,4 @@
-import { CONTEXT_CHUNKS, EMBEDDING_MODEL_ID, formatQueryInput } from 'repotron-domain'
+import { CONTEXT_CHUNKS, EMBEDDING_MODEL_ID, formatQueryInput, keywordMatch, RETRIEVAL_TOP_K } from 'repotron-domain'
 import type { SourceChunkRecord } from 'db'
 
 import { getAi, getConfig, getRepositories, getVectors } from '../../context.ts'
@@ -17,7 +17,21 @@ export async function retrieveChunks(indexId: string, question: string): Promise
     returnValues: false,
     returnMetadata: 'none',
   })
-  const ids = (result.matches ?? []).map((match) => match.id)
+  return rowsInOrder(indexId, (result.matches ?? []).map((match) => match.id))
+}
+
+export async function retrieveKeywordChunks(indexId: string, question: string): Promise<SourceChunkRecord[]> {
+  const match = keywordMatch(question)
+  if (match === '') return []
+  const ids = await getRepositories().sourceChunks.listIdsByKeyword({
+    indexId,
+    match,
+    limit: RETRIEVAL_TOP_K,
+  })
+  return rowsInOrder(indexId, ids)
+}
+
+async function rowsInOrder(indexId: string, ids: string[]): Promise<SourceChunkRecord[]> {
   const rows = await getRepositories().sourceChunks.listByIds({ indexId, ids })
   const byId = new Map(rows.map((row) => [row.id, row]))
   return ids.flatMap((id) => {

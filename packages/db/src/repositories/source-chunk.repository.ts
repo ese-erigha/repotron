@@ -7,6 +7,7 @@ export type ListChunksByIdInput = { indexId: string; ids: string[] }
 export type ListChunkIdPageInput = { indexId: string; limit: number }
 export type DeleteChunksThroughInput = { indexId: string; lastId: string }
 export type ListChunkPathsInput = { indexId: string; limit: number }
+export type ListChunksByKeywordInput = { indexId: string; match: string; limit: number }
 
 export class SourceChunkRepository {
   private readonly database: RepotronDatabase
@@ -53,6 +54,21 @@ export class SourceChunkRepository {
   async deleteThrough(input: DeleteChunksThroughInput): Promise<void> {
     const match = and(eq(sourceChunks.indexId, input.indexId), lte(sourceChunks.id, input.lastId))
     await this.database.delete(sourceChunks).where(match)
+  }
+
+  async listIdsByKeyword(input: ListChunksByKeywordInput): Promise<string[]> {
+    const result = await this.database.$client
+      .prepare(
+        `SELECT chunk_id AS chunkId
+         FROM chunk_keywords
+         WHERE chunk_keywords MATCH ?1 AND index_id = ?2
+         ORDER BY rank
+         LIMIT ?3`,
+      )
+      .bind(input.match, input.indexId, input.limit)
+      .all()
+    const rows = result.results as { chunkId: string }[]
+    return rows.map((row) => row.chunkId)
   }
 
   async listPaths(input: ListChunkPathsInput): Promise<string[]> {

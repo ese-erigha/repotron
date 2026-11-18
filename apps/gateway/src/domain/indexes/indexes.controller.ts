@@ -39,6 +39,7 @@ indexes.post('/:id/questions', async (c) => {
     body,
     remoteIp: c.req.header('CF-Connecting-IP') ?? '',
     evalToken: c.req.header(EVAL_TOKEN_HEADER) ?? '',
+    retrieval: c.req.query('retrieval') ?? '',
   })
   return new Response(stream, {
     status: 201,
