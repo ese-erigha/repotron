@@ -271,12 +271,16 @@ Add `EVAL_TOKEN` to the gateway env schema with the other required secrets. No s
 
 ### Stage 2: Write the golden set
 
+**Status.** Done. All three indexes are `ready` on staging, and the ids in `apps/evals/golden/` match those rows.
+
 - Add the three YAML files with 60 questions and real line ranges.
 - Index Hono and Flask at the pinned commits from the home page, if those index rows are not `ready`.
 - Record each index id in its YAML file.
 - **Staging check:** `GET /api/v1/indexes/:id` returns `ready` for all three ids. Open one ground-truth GitHub link for each repository and confirm the lines exist at that commit.
 
 ### Stage 3: Score retrieval
+
+**Status.** Done. The harness reads the retrieval event and scores overlap. The tests do not call the network.
 
 - Add `apps/evals` with uv, ruff, mypy `--strict`, and pytest.
 - `ask.py` posts one question, reads the SSE events, and returns the retrieved ranges, the answer, the cited ranges, and the times and token counts from `done`.
@@ -287,12 +291,16 @@ Add `EVAL_TOKEN` to the gateway env schema with the other required secrets. No s
 
 ### Stage 4: Score the answer
 
+**Status.** The judge and `evals.run` are in the package. GitHub Actions runs them. Nothing runs on a laptop.
+
 - Add the DeepEval judge calls through AI Gateway.
 - Faithfulness receives the answer and the retrieved chunk text. Answer relevance receives the answer and the question.
 - The report fills all six scores, the latency numbers, and the cost.
 - **Staging check:** one local run of `uv run python -m evals.run` against the three ready indexes writes `report.json`. Each question id appears once. A known `out_of_repo` item shows an empty citation list when the model refuses.
 
 ### Stage 5: Turn on the gate
+
+**Status.** `.github/workflows/eval.yml` runs on a pull request and compares `baseline.json`. A manual run with "Write baseline" asks the 60 questions and opens a pull request that adds `baseline.json`. The proof pull request that sets `CONTEXT_CHUNKS` to 1 is still open work, and it must not be merged.
 
 - Copy the quality scores from the stage 4 report into `baseline.json` and commit that file.
 - Add `.github/workflows/eval.yml`.

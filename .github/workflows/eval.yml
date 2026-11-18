@@ -1,0 +1,57 @@
+name: Eval
+
+on:
+  pull_request:
+    branches:
+      - develop
+  workflow_dispatch:
+    inputs:
+      write_baseline:
+        description: "Write baseline.json from this run and open a pull request"
+        required: true
+        type: boolean
+        default: false
+
+env:
+  CF_SEND_TELEMETRY: "false"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: apps/evals
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && 'develop' || github.sha }}
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - name: Score the golden set
+        env:
+          EVAL_TOKEN: ${{ secrets.EVAL_TOKEN }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          CF_AIG_TOKEN: ${{ secrets.CF_AIG_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WRITE_BASELINE: ${{ inputs.write_baseline }}
+        run: uv run python -m evals.run
+      - name: Open a pull request for the baseline
+        if: inputs.write_baseline
+        working-directory: ${{ github.workspace }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B eval-baseline
+          git add apps/evals/baseline.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Add the eval baseline"
+          git push --force-with-lease -u origin eval-baseline
+          gh pr create --base develop --head eval-baseline --title "Add the eval baseline" --body "Scores from the Eval workflow. Merge this pull request so later pull requests can compare against it." || gh pr view eval-baseline --json url --jq .url
