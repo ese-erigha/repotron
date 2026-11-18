@@ -169,6 +169,8 @@ The query reads `chunk_keywords` for that symbol in that index. The limit is 50 
 
 **Status.** The harness prints `identifierHitAt1` beside the six scores. It does not fail the gate. The dense number is recorded here after the manual Eval run.
 
+identifierHitAt1: 0.5
+
 The production path stays dense.
 
 - Compute hit@1 from the retrieval event the harness already reads.
@@ -176,6 +178,8 @@ The production path stays dense.
 - **Staging check:** one manual Eval run prints a hit@1 for the dense path. Record that number in the stage status of this file after the run. That number is the dense baseline.
 
 ### Stage 2: Add the FTS table
+
+**Status.** The SQL file creates `chunk_keywords`, the triggers, and the backfill. The question path does not read the table yet. The row-count check waits until CI applies the migration.
 
 - Add the SQL file. It creates `chunk_keywords`, the insert trigger, the delete trigger, and the backfill.
 - Update the Drizzle schema by hand so it matches the SQL.
