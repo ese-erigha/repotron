@@ -48,7 +48,7 @@ Python runs where the work needs it: parsing and evaluation. Parsing a large rep
   fetch tarball → walk files → Tree-sitter → chunks → R2
 
 Shared stores
-  ├── [ D1 ]          github_repositories, repository_indexes, source_chunks, answered_questions, source_chunks_fts (Phase 3)
+  ├── [ D1 ]          github_repositories, repository_indexes, source_chunks, answered_questions, chunk_keywords (Phase 3)
   ├── [ Vectorize ]   one namespace per index
   ├── [ R2 ]          chunk batches, eval reports
   ├── [ Workers AI ]  embeddings, reranker
@@ -244,7 +244,7 @@ Python 3.12. One uv project with its own `uv.lock`, because the Docker build con
 - `repository_indexes` — id, repository id, commit sha, status, failed stage, failure reason, file count, chunk count, embedding model id, created time, updated time, ready time, last question time
   - The status is one of `queued`, `parsing`, `embedding`, `ready`, `failed`, and `deleting`.
 - `source_chunks` — id, index id, sequence number, path, language, symbol, kind, start line, end line, content, identifiers
-- `source_chunks_fts` — an FTS5 table over `source_chunks`. Phase 3.
+- `chunk_keywords` — an FTS5 table over `source_chunks`. Phase 3.
 - `answered_questions` — id, index id, repository full name, commit sha, preset, question, answer, citations, embedding model id, answer model id, input tokens, output tokens, retrieval time, first token time, answer time, created time
   - The id is a random 128-bit value, so nobody can guess a share link.
   - `index_id` has no foreign key, so the row outlives its index.
@@ -311,7 +311,7 @@ Python 3.12, managed with uv. CI runs it against the staging gateway. Phase 2 de
 2. Phase 1: embed the question, then query Vectorize with `topK` 8 in the namespace of the index.
 3. Phase 3: run the hybrid path instead.
    1. Embed the question. Query Vectorize with `topK` 50 and the scope filters.
-   2. Query `chunks_fts` with BM25 for the top 50. Quote each term of the question and join the terms with `OR`.
+   2. Query `chunk_keywords` with BM25 for the top 50. Quote each term of the question and join the terms with `OR`.
    3. Fuse the two lists with RRF: `score(chunk) = Σ 1 / (60 + rank)`, one term for each list.
    4. Send the top 50 fused chunks to the reranker. Keep the top 8.
    5. Give each kept chunk a confidence label from its reranker score. Refer to the confidence rules below.
@@ -351,7 +351,7 @@ The cleanup cron starts the same Workflow.
 ### Scenario D: The user traces a symbol (Phase 3)
 
 1. The gateway applies the rate limit and loads the index.
-2. It queries `chunks_fts` for the symbol name in the `identifiers` column, in that index. The limit is 50 rows.
+2. It queries `chunk_keywords` for the symbol name in the `identifiers` column, in that index. The limit is 50 rows.
 3. It splits the rows into two lists:
    - Definitions: rows where `source_chunks.symbol` equals the name
    - Usages: the other rows
