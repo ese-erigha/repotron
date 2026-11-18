@@ -9,6 +9,7 @@ export {
   type RepositoryIndexRecord,
 } from './repository-indexes.ts'
 export { sourceChunks, type NewSourceChunkRecord, type SourceChunkRecord } from './source-chunks.ts'
+export { chunkKeywords, type ChunkKeywordRecord } from './chunk-keywords.ts'
 export {
   answeredQuestions,
   type AnsweredQuestionRecord,
