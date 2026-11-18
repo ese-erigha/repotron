@@ -300,11 +300,13 @@ Add `EVAL_TOKEN` to the gateway env schema with the other required secrets. No s
 
 ### Stage 5: Turn on the gate
 
-**Status.** `.github/workflows/eval.yml` runs on a pull request and compares `baseline.json`. A manual run with "Write baseline" asks the 60 questions and opens a pull request that adds `baseline.json`. The proof pull request that sets `CONTEXT_CHUNKS` to 1 is still open work, and it must not be merged.
+**Status.** `.github/workflows/eval.yml` runs on a pull request and compares `baseline.json`. The 60 questions run only when that pull request changes `apps/gateway`, `apps/evals`, `packages/domain`, `packages/db`, or the workflow file. Any other pull request lints and skips the score. A manual run with "Write baseline" always asks the 60 questions and opens a pull request that adds `baseline.json`. The proof pull request that sets `CONTEXT_CHUNKS` to 1 is still open work, and it must not be merged.
 
 - Copy the quality scores from the stage 4 report into `baseline.json` and commit that file.
 - Add `.github/workflows/eval.yml`.
   - It runs on a pull request to `develop` and on `workflow_dispatch`.
+  - A pull request scores the 60 questions only when the diff touches `apps/gateway`, `apps/evals`, `packages/domain`, `packages/db`, or `.github/workflows/eval.yml`. Lint still runs.
+  - `workflow_dispatch` always scores the 60 questions.
   - It checks out the code, installs uv, and runs the eval package.
   - It does not deploy and it does not apply a migration.
   - The job timeout is 60 minutes. The harness asks one question at a time.
@@ -333,7 +335,7 @@ The harness exits 1 in these cases:
 
 - **Judge noise.** One harsh judge score can fail a good pull request. Temperature 0 and one transport retry reduce that. They do not remove it. If the same commit fails two runs on judge scores alone, rerun `workflow_dispatch` once and record both reports in the pull request.
 - **A chunker change moves line groups.** The golden commit does not move, but a new split can drop recall. That drop is a real failure. Fix the chunker or update the golden ranges in a pull request that explains the new lines.
-- **Cost.** One full run asks 60 questions and then runs the judge. Run the full set on the pull request. Do not run it on every push to a feature branch.
+- **Cost.** One full run asks 60 questions and then runs the judge. Run that set only for a pull request that changes the gateway, the question settings, the database package, or the eval harness. A manual run always asks the 60. Do not run it on every push to a feature branch.
 - **A stale index.** Cleanup deletes an index with no question for 30 days. A golden index that nobody asks about for 30 days disappears. The eval questions update `last_question_at` when they succeed, so a green run refreshes the clock. A month with no pull request can still delete the index. The failed job names the index id. Index that commit again from the home page.
 - **The eval token.** A leaked token lets one client skip the question limit. The token is a Worker secret and a GitHub secret. It is not in the repo and not in the web app.
 
