@@ -21,7 +21,8 @@ def main() -> None:
     account_id = _env("CLOUDFLARE_ACCOUNT_ID")
     openrouter_key = _env("OPENROUTER_API_KEY")
     gateway_token = _env("CF_AIG_TOKEN")
-    origin = os.environ.get("EVAL_GATEWAY_ORIGIN", GATEWAY_ORIGIN)
+    configured = os.environ.get("EVAL_GATEWAY_ORIGIN", "").strip()
+    origin = configured or GATEWAY_ORIGIN
     questions = load_golden(ROOT / "golden")
     records: list[dict[str, object]] = []
     scored: list[QuestionScore] = []
