@@ -19,6 +19,12 @@ const env = {
 }
 
 describe('gateway', () => {
+  it('when the health path is requested, then the gateway returns ok', async () => {
+    const response = await app.request('/health', {}, env)
+    assert.equal(response.status, 200)
+    assert.deepEqual(await response.json(), { ok: true })
+  })
+
   it('when the path is unknown, then the gateway returns the not found envelope', async () => {
     const response = await app.request('/api/v1/unknown', {}, env)
     assert.equal(response.status, 404)
