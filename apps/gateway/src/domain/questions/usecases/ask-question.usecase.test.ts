@@ -60,6 +60,33 @@ describe('askQuestion', () => {
     assert.equal(calls.n, 1)
   })
 
+  it('when retrieval is omitted, then the question searches vectors and keywords', async () => {
+    const keyword = { indexId: '', match: '' }
+    let vectorQueries = 0
+    const stream = await gatewayStorage.run(
+      context({
+        calls: { n: 0 },
+        allowed: true,
+        keyword,
+        onVectorQuery: () => {
+          vectorQueries += 1
+        },
+      }),
+      () =>
+        askQuestion({
+          indexId: '9-abc',
+          body: { question: 'Where is getUserById?' },
+          remoteIp: '203.0.113.5',
+          evalToken: '',
+          retrieval: '',
+        }),
+    )
+    await new Response(stream).text()
+
+    assert.equal(keyword.indexId, '9-abc')
+    assert.equal(vectorQueries, 1)
+  })
+
   it('when the eval token matches and retrieval is bm25, then the keyword query binds the index id', async () => {
     const keyword = { indexId: '', match: '' }
     let vectorQueries = 0
