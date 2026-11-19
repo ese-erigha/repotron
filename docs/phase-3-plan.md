@@ -8,7 +8,7 @@ Do not implement the stages in one pull request. A red eval would not say which 
 
 ## Operation
 
-The order is the order in [retrieval-improvement-plan.md](retrieval-improvement-plan.md). Step 1 deletes `repotron-staging-chunks` and creates it again at 1024 dimensions, then re-indexes with `mongodb/voyage-code-4`. Hybrid search is step 2. The reranker text test is step 3. Do not run hybrid search before that re-index.
+The order is the order in [retrieval-improvement-plan.md](retrieval-improvement-plan.md). Step 1 clears the staging rows and recreates `repotron-staging-chunks` at 1024 dimensions. Step 2 is the code pull request for `mongodb/voyage-code-4`, and that pull request does not run the 30-question eval. Hybrid search waits until the three pinned commits are in the new index.
 
 **Read first, in this order:**
 
@@ -46,7 +46,7 @@ The order is the order in [retrieval-improvement-plan.md](retrieval-improvement-
 
 **Out of scope.**
 
-- A second embedding model besides the code model in step 1 of [retrieval-improvement-plan.md](retrieval-improvement-plan.md). That step replaces `repotron-staging-chunks`. The model list is in that file. The re-index uses the three pinned commits, not the branch tip.
+- A second embedding model besides `mongodb/voyage-code-4` in [retrieval-improvement-plan.md](retrieval-improvement-plan.md). Step 1 recreates `repotron-staging-chunks`. Step 2 switches the code. The re-index uses the three pinned commits, not the branch tip.
 - A new answer model.
 - A change to chunking. `CONTEXT_CHUNKS` stays 8 for the semantic list. The hybrid priority may add one keyword chunk beyond those 8.
 - The public dashboard and storing reports in R2 (Phase 4).
@@ -129,7 +129,7 @@ The question path uses semantic search with a limit of 8. When the question star
 
 ### Decision E: The reranker is measured before it serves traffic
 
-The model is Workers AI `bge-reranker-base`. The score range is unknown. Before any label ships:
+The reranker is OpenRouter `mongodb/rerank-3`. `@cf/baai/bge-reranker-base` was measured and is not used. Before any label ships:
 
 1. Run the reranker on 20 question and chunk pairs from the golden set.
 2. Record the lowest score and the highest score in `apps/evals/reranker-scores.md`.
@@ -162,7 +162,7 @@ The query reads `chunk_keywords` for that symbol in that index. The limit is 50 
 
 ## 4. What stays
 
-- The live embedding model is `@cf/google/embeddinggemma-2` until step 1 of [retrieval-improvement-plan.md](retrieval-improvement-plan.md). That step deletes `repotron-staging-chunks`, creates it again at 1024 dimensions, and fills it with `mongodb/voyage-code-4`.
+- The live embedding model is `@cf/google/embeddinggemma-2` until step 2 of [retrieval-improvement-plan.md](retrieval-improvement-plan.md). Step 1 clears the database and recreates `repotron-staging-chunks` at 1024 dimensions. Step 2 switches the code to `mongodb/voyage-code-4`. Step 3 fills the index.
 - The answer model stays `anthropic/claude-haiku-5.5`.
 - `CONTEXT_CHUNKS` stays 8.
 - The preview Worker name stays `repotron-pr-<number>-gateway`. The rate limiter stays on `repotron-staging-gateway`.
@@ -208,7 +208,7 @@ The production path stays dense.
 
 ### Stage 4: Turn on hybrid search
 
-**Status.** Priority. This is step 2 of [retrieval-improvement-plan.md](retrieval-improvement-plan.md). It starts after the code-model index replaces `repotron-staging-chunks`. Do not merge unless identifier hit@1 stays at the floor from that re-index.
+**Status.** Priority. This is step 4 of [retrieval-improvement-plan.md](retrieval-improvement-plan.md). It starts after step 3 fills the new index. Do not merge unless identifier hit@1 stays at the floor from that re-index.
 
 - Call `semanticSearch` with a limit of 8.
 - Move the named symbol to position 1 when the question starts with "where is".
@@ -227,7 +227,7 @@ The production path stays dense.
 
 ### Stage 6: Turn on rerank and the labels
 
-**Status.** Priority. This is steps 3 and 4 of [retrieval-improvement-plan.md](retrieval-improvement-plan.md). The sort stays off until a definition scores above a readme. The production path stays semantic search plus the symbol move until that check passes.
+**Status.** Priority. This is steps 5 and 6 of [retrieval-improvement-plan.md](retrieval-improvement-plan.md). The model is `mongodb/rerank-3`. The sort stays off until a definition scores above a readme. The production path stays semantic search plus the symbol move until that check passes.
 
 - Rerank the top 50 fused chunks. Keep 8.
 - Attach high, medium, or low to each citation in the retrieval event and in the saved citation JSON.
@@ -266,10 +266,10 @@ The production path stays dense.
 - **The gate and the new metric.** A hybrid change can raise hit@1 and still drop recall by more than 0.02. The required check fails. Fix the ranking or revert the stage. Do not widen the gate.
 - **Reranker latency.** Fifty pairs can push retrieval p95 over 800 ms. Stage 6 does not merge when the printed p95 is over that target.
 - **Judge noise.** Faithfulness and answer relevance can move by more than 0.02 on one run. The same rule as Phase 2 applies. When the same commit fails twice on judge scores alone, rerun the workflow once and record both reports.
-- **A new embedding model.** It is out of this plan. Shipping it beside the reranker would mix a new vector space with a new ranker.
+- **A new embedding model.** Step 1 clears staging and recreates the index. Step 2 changes the code in its own pull request, with the 30-question eval off. Do not add hybrid search to that pull request.
 
 ---
 
 ## 7. Secrets
 
-No new secret. The reranker uses the Workers AI binding. That binding is already on the gateway. The preview deploy already sends the gateway secrets.
+No new secret. `mongodb/rerank-3` uses the OpenRouter key that the answer model already uses. The preview deploy already sends the gateway secrets.
