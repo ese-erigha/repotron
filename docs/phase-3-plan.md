@@ -4,6 +4,19 @@ This plan turns Phase 3 of [prd.md](prd.md) into work that one implementer can d
 
 Do not implement the stages in one pull request. A red eval would not say which stage failed. The reranker thresholds are unknown until they are measured. The FTS table must exist on staging before a question reads it.
 
+**Priority.** Hybrid search and the reranker come first. Scope filters and the symbol trace wait until those two pass the gate.
+
+## Operation
+
+Do not re-index for steps 1 and 2. `chunk_keywords` is already filled. The vectors for the three golden commits are already in `repotron-staging-chunks`. A re-index does not change those rows. Re-index only in step 4, and only when that step says to.
+
+Run the steps in order. One step is one pull request. Stop a step when its check fails. Do not start the next step to hide that failure.
+
+1. Add one keyword chunk. Keep the semantic top 8 in their current order, including the symbol move for a "where is" question. Call `keywordSearch` with a limit of 50. When the best keyword chunk is not already in the 8, append it. The model receives 9 chunks. Do not drop a semantic chunk. Merge only when recall stays at 0.7407 and `identifierHitAt1` stays at 1.0. When recall drops, stop. Do not try another swap inside the 8.
+2. Change the reranker text. Do not sort the live answer list. Score the same 20 ground-truth pairs with `@cf/baai/bge-reranker-base`. Send the symbol name, not the full question, and keep the chunk title in the passage. Record the low score, the high score, and the sigmoid decision in `apps/evals/reranker-scores.md`. The check passes when the lowest definition score is above the readme score for "What is Flask?" (0.9927901029586792 on the titled passage). When a definition still scores lower, try one more text, the question "Where is {symbol} defined?". When that also fails, stop. Do not turn the sort on.
+3. Turn the reranker on only after step 2 passes. Sort the 9 chunks by the reranker score. On a "where is" question, the symbol-matched chunk stays first. Merge only when recall stays at 0.7407, `identifierHitAt1` stays at 1.0, and retrieval p95 stays under 800 ms.
+4. Compare BM25 alone with semantic search alone on the 30 questions, split by question kind. Write the scores in `apps/evals/ablation.json`. Re-index only when BM25 wins both the identifier kind and the concept kind. The re-index is a new Vectorize index, one new embedding model, and a fresh index of the three pinned commits. It is not a reload of the current vectors. A new baseline comes after that index is `ready`. When BM25 does not win both kinds, do not re-index.
+
 **Read first, in this order:**
 
 1. `.cursor/rules/repotron.mdc` — the standing rules. They win over this plan when the two disagree.
@@ -40,9 +53,9 @@ Do not implement the stages in one pull request. A red eval would not say which 
 
 **Out of scope.**
 
-- A new embedding model. `voyage-code-3` and `text-embedding-3-small` need a new Vectorize index and a re-index of the pinned commits. The home page indexes the tip of the default branch, not a chosen SHA.
+- A new embedding model before step 4 of the operation. Step 4 is the only step that may re-index. The home page indexes the tip of the default branch, not a chosen SHA, so the re-index uses the three pinned commits.
 - A new answer model.
-- A change to chunking or to `CONTEXT_CHUNKS`.
+- A change to chunking. `CONTEXT_CHUNKS` stays 8 for the semantic list. The hybrid priority may add one keyword chunk beyond those 8.
 - The public dashboard and storing reports in R2 (Phase 4).
 
 ---
@@ -202,7 +215,7 @@ The production path stays dense.
 
 ### Stage 4: Turn on hybrid search
 
-**Status.** A normal question uses semantic search with a limit of 8. A "where is" question moves the named symbol to position 1. The last-slot keyword swap dropped recall from 0.7407 to 0.7037, so a keyword chunk does not replace a semantic chunk. The eval token can still request `retrieval=dense` or `retrieval=bm25`. Do not merge unless identifier hit@1 is above 0.5.
+**Status.** Priority. Follow step 1 of the operation. A normal question still uses the semantic top 8 until that pull request merges. The last-slot swap dropped recall from 0.7407 to 0.7037. Do not merge unless identifier hit@1 is above 0.5.
 
 - Call `semanticSearch` with a limit of 8.
 - Move the named symbol to position 1 when the question starts with "where is".
@@ -221,7 +234,7 @@ The production path stays dense.
 
 ### Stage 6: Turn on rerank and the labels
 
-**Status.** Do not start this stage. The plain passage and the titled passage both score definitions near 0 and concept passages near 1. Sorting by that score would put a readme chunk ahead of a function definition. The production path stays the semantic top 8.
+**Status.** Priority. Follow steps 2 and 3 of the operation. The plain passage and the titled passage both score definitions near 0 and concept passages near 1. The sort stays off until step 2 passes. The production path stays the semantic top 8 until step 3.
 
 - Rerank the top 50 fused chunks. Keep 8.
 - Attach high, medium, or low to each citation in the retrieval event and in the saved citation JSON.
@@ -230,7 +243,7 @@ The production path stays dense.
 
 ### Stage 7: Add scope filters
 
-**Status.** The ask form can send a language and a path prefix. Golden questions send neither. A path prefix of 64 bytes or less is a Vectorize range filter. A longer prefix is applied to the loaded rows. Keyword rows are filtered the same way.
+**Status.** Not the priority. The ask form can send a language and a path prefix. Golden questions send neither. A path prefix of 64 bytes or less is a Vectorize range filter. A longer prefix is applied to the loaded rows. Keyword rows are filtered the same way. Hybrid search and the reranker come first.
 
 - Add the language field and the path prefix field to the ask form and to the question schema.
 - Apply Decision G.
@@ -238,6 +251,8 @@ The production path stays dense.
 - **Staging check:** the required eval check is green. One staged question with a path prefix returns only chunks under that prefix.
 
 ### Stage 8: Add the symbol trace
+
+**Status.** Not the priority. Hybrid search and the reranker come first.
 
 - Add `GET /api/v1/indexes/:id/symbols/:name`.
 - Add the trace box on the ask screen.
