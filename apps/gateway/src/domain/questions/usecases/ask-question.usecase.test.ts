@@ -60,7 +60,7 @@ describe('askQuestion', () => {
     assert.equal(calls.n, 1)
   })
 
-  it('when retrieval is omitted, then the question searches vectors and keywords', async () => {
+  it('when retrieval is omitted, then the question searches vectors and skips the keyword query', async () => {
     const keyword = { indexId: '', match: '' }
     let vectorQueries = 0
     const stream = await gatewayStorage.run(
@@ -83,7 +83,7 @@ describe('askQuestion', () => {
     )
     await new Response(stream).text()
 
-    assert.equal(keyword.indexId, '9-abc')
+    assert.equal(keyword.indexId, '')
     assert.equal(vectorQueries, 1)
   })
 

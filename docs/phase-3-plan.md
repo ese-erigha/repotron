@@ -54,10 +54,8 @@ Phase 2 already scores the golden set against a preview of the pull request's ga
 ```text
 Question
   embed the question
-  Vectorize top 50 in the index namespace
-  BM25 top 50 from chunk_keywords for that index
-  keep the vector top 8
-  move the keyword rank-1 chunk to the front when it is in the vector top 50
+  Vectorize top 8 in the index namespace
+  when the question starts with "where is", move the chunk whose symbol is the last name to the front
   rerank the top 50
   keep the top 8
   label each kept chunk
@@ -69,7 +67,7 @@ Symbol trace
   no model call
 ```
 
-Until the rerank stage, the model still receives 8 chunks. Those 8 are the vector top 8. The keyword rank-1 chunk moves to position 1 when that chunk is also in the vector top 50. The answer path does not grow to 50 chunks.
+Until the rerank stage, the model still receives the vector top 8. A question that starts with "where is" moves the chunk whose symbol equals the last name to position 1. A role word such as "function" or "decorator" is not a name. The chunk set stays the vector set.
 
 ---
 
@@ -117,9 +115,9 @@ The migration creates this table, the insert trigger, the delete trigger, and on
 
 The backfill covers the three golden indexes that are already `ready`. A question must not depend on a re-index.
 
-### Decision D: The final 8 stay in vector order
+### Decision D: A where-is question promotes the named symbol
 
-The question path keeps the vector top 8. The keyword rank-1 chunk moves to position 1 when that chunk is also in the vector top 50. When that chunk is outside the vector list, the vector order stays. The list length stays `CONTEXT_CHUNKS`, which is 8.
+The question path keeps the vector top 8. When the question starts with "where is", the chunk whose symbol equals the last name moves to position 1. The last name in "Where is the object schema function defined?" is `object`, because `schema`, `function`, and `defined` are role words. When no chunk has that symbol, the vector order stays. The chunk set does not change.
 
 `fuseRanks` still computes `score(chunk) = Σ 1 / (60 + rank)`. Rank starts at 1. `RRF_K` is 60. `RETRIEVAL_TOP_K` is 50. The question path does not use that score to choose the 8.
 
@@ -204,11 +202,11 @@ The production path stays dense.
 
 ### Stage 4: Turn on hybrid search
 
-**Status.** A normal question keeps the vector top 8. The keyword rank-1 chunk moves to position 1 when that chunk is also in the vector top 50. The eval token can still request `retrieval=dense` or `retrieval=bm25`. Do not merge unless identifier hit@1 is above 0.5.
+**Status.** A normal question uses the vector top 8. A question that starts with "where is" moves the chunk whose symbol equals the last name to position 1. The eval token can still request `retrieval=dense` or `retrieval=bm25`. Do not merge unless identifier hit@1 is above 0.5.
 
-- Take the vector top 50 and the keyword top 50.
 - Give the model the vector top 8.
-- Move the keyword rank-1 chunk to position 1 when it is inside the vector top 50.
+- Move the named symbol to position 1 when the question starts with "where is".
+- Leave the chunk set unchanged.
 - This is the production path.
 - **Staging check:** the required eval check is green. The printed identifier hit@1 is higher than the dense number from stage 1. When hit@1 is not higher, do not merge.
 
