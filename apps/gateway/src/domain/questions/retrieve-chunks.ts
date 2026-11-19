@@ -21,8 +21,10 @@ export async function retrieveKeywordChunks(indexId: string, question: string): 
 }
 
 export async function retrieveHybridChunks(indexId: string, question: string): Promise<SourceChunkRecord[]> {
-  const dense = await vectorIds(indexId, question, RETRIEVAL_TOP_K)
-  const keywords = await keywordIds(indexId, question)
+  const [dense, keywords] = await Promise.all([
+    vectorIds(indexId, question, RETRIEVAL_TOP_K),
+    keywordIds(indexId, question),
+  ])
   const fused = fuseRanks(dense, keywords).slice(0, CONTEXT_CHUNKS)
   return rowsInOrder(indexId, fused)
 }
