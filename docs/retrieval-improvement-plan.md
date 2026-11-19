@@ -18,7 +18,7 @@ Precision is the weak number. About 1 chunk in 8 overlaps the expected lines. Re
 
 ## Models
 
-The live index uses `@cf/google/embeddinggemma-2`. That model is a general text model. The re-index replaces it with a code embedding model. The new Vectorize index replaces `repotron-staging-chunks`. Do not write the new vectors into the old index.
+The live index uses `@cf/google/embeddinggemma-2`. That model is a general text model. The re-index deletes `repotron-staging-chunks` and creates it again at 1024 dimensions. The name stays. The vectors do not. A purge of the old vectors is not enough, because a 768-dimension index cannot store a 1024-number vector.
 
 The code models are these. The default is `mongodb/voyage-code-4` on OpenRouter, at 1024 dimensions. We already call OpenRouter for the answer model.
 
@@ -56,14 +56,16 @@ The keyword table does not depend on the embedding model. It stays. The re-index
 One step is one pull request. Stop when the check fails. Do not hide a failure by starting the next step.
 
 1. Re-index. Replace the general-purpose vectors before any hybrid test.
-   - Create a new Vectorize index with 1024 dimensions.
+   - Delete the Vectorize index `repotron-staging-chunks`.
+   - Create `repotron-staging-chunks` again with 1024 dimensions and cosine distance.
+   - Create the string metadata indexes on `path`, `language`, and `kind` before the first insert.
    - Embed the three pinned commits with `mongodb/voyage-code-4`.
    - The embedding text is `title: path symbol | text: content`, plus the first docstring or the signature when the chunk has one.
-   - Point the gateway and the pipeline at the new index.
+   - Keep the binding name `repotron-staging-chunks`. The gateway and the pipeline do not change index names.
    - Keep the symbol move.
+   - Questions have no vectors from the delete until the new index is `ready`.
    - Run the 30 questions on semantic search plus the symbol move.
    - Record the new recall and the new `identifierHitAt1`. Those two numbers are the floor for steps 2 and 4.
-   - Delete `repotron-staging-chunks` after that run has a recorded score.
 2. Hybrid search. Do this on the new index only. Give the model the 8 semantic chunks plus one keyword chunk. Do not reorder the 8, and do not delete one of them.
    - Run semantic search for the top 8, then the symbol move. A "where is" question still puts the named function first.
    - Run keyword search for the top 50.
@@ -79,8 +81,7 @@ One step is one pull request. Stop when the check fails. Do not hide a failure b
    - Pass when every definition score is above the readme score for "What is Flask?" on this same run.
    - If a definition is still lower, run the 20 pairs once more. The query text is `Where is {symbol} defined?`.
    - If that run also fails, leave `bge-reranker-base` unused for sorting. Step 4 then tries `mongodb/rerank-3`.
-3. Re-index the three pinned commits with `mongodb/voyage-code-4` at 1024 dimensions. Create a new Vectorize index and point the gateway and the pipeline at it. Delete `repotron-staging-chunks` after the new index is `ready` and the 30 questions have run. The embedding text stays `title: path symbol | text: content`, and it adds the first docstring or the signature when the chunk has one. The raw code stays in `chunk_keywords`. The symbol move stays. Record the new recall and the new `identifierHitAt1` as the floor for later steps.
-4. Choose the reranker on the new index. If step 3 passed, use `@cf/baai/bge-reranker-base`. If step 3 failed, score the same 20 pairs with `mongodb/rerank-3` and apply the same definition-versus-readme check. Sort the chunks only after that check passes. On a "where is" question, the symbol-matched chunk stays first. Merge only when recall and `identifierHitAt1` stay at the floor from step 1, and retrieval p95 stays under 800 ms.
+4. Choose the reranker on `repotron-staging-chunks` after step 1. If step 3 passed, use `@cf/baai/bge-reranker-base`. If step 3 failed, score the same 20 pairs with `mongodb/rerank-3` and apply the same definition-versus-readme check. Sort the chunks only after that check passes. On a "where is" question, the symbol-matched chunk stays first. Merge only when recall and `identifierHitAt1` stay at the floor from step 1, and retrieval p95 stays under 800 ms.
 5. Write the comparison. Score keyword search alone, semantic search alone, semantic search plus the extra keyword chunk, and that list after the reranker. Use the 30 questions. Split the scores by question kind. Commit the file as `apps/evals/ablation.json`. Do not change the production path in this pull request.
 
 ## What this plan refuses
@@ -98,4 +99,4 @@ One step is one pull request. Stop when the check fails. Do not hide a failure b
 - Precision is above 0.1019 on that index.
 - Refusal stays at 1.0.
 - The reranker sorts only if a definition scores above a readme on the 20 pairs.
-- `repotron-staging-chunks` is deleted after the code-model index is `ready` and the 30 questions have a recorded score.
+- `repotron-staging-chunks` is deleted and created again at 1024 dimensions. The name stays.

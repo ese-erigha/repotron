@@ -260,7 +260,7 @@ D1 stops at 10 GB for one database. The 30-day cleanup keeps the chunk text unde
 - The vector id is the chunk id, `<indexId>:<chunkSeq>`. Vectorize limits an id to 64 bytes.
 - The metadata holds `path`, `language`, and `kind`. Create the metadata indexes before the first insert.
 - Vectorize indexes only the first 64 bytes of a metadata value. A path filter longer than that becomes a filter after the query.
-- The dimension of an index is fixed. A new embedding model needs a new Vectorize index and a full re-index.
+- The dimension of an index is fixed. `repotron-staging-chunks` is 768 today. `mongodb/voyage-code-4` needs 1024, so step 1 of [retrieval-improvement-plan.md](retrieval-improvement-plan.md) deletes that index and creates it again. A purge of the vectors is not enough.
 - An upsert is asynchronous. A vector is searchable only after Vectorize processes the mutation.
 
 **R2** holds the chunk batches of an index job, and the eval reports from Phase 4. The Workflow deletes the batches after the `ready` step or after a failure.
@@ -269,7 +269,7 @@ D1 stops at 10 GB for one database. The 30-day cleanup keeps the chunk text unde
 
 AI Gateway fronts each model call. It records the model id, the tokens, and the latency for the `answered_questions` row.
 
-- **Embeddings.** The live index uses Workers AI `@cf/google/embeddinggemma-2`. It is a general text model. It gives 768 dimensions and has an 8,192-token context window. It does not replace a code embedding model. The replacement index uses `mongodb/voyage-code-4` at 1024 dimensions and then deletes `repotron-staging-chunks`. The model list is in [retrieval-improvement-plan.md](retrieval-improvement-plan.md).
+- **Embeddings.** The live index uses Workers AI `@cf/google/embeddinggemma-2`. It is a general text model. It gives 768 dimensions and has an 8,192-token context window. The re-index deletes `repotron-staging-chunks` and creates it again at 1024 dimensions for `mongodb/voyage-code-4`. The model list is in [retrieval-improvement-plan.md](retrieval-improvement-plan.md).
   - The model id is the constant `EMBEDDING_MODEL_ID` in `packages/domain`, not a Worker var. The gateway and the pipeline must use the same model, and the Vectorize dimension depends on it.
   - The model expects task prefixes. A question becomes `task: search result | query: <question>`. A chunk uses the `title` and `text` form in the chunk rules.
   - One request allows 8,192 tokens. That limit is the sum of every text in the request. `EMBED_BATCH_SIZE` is 1, so one chunk at the 1,500-token cap stays under that limit. `EMBED_CONCURRENCY` is 10, so ten calls run at the same time.

@@ -8,7 +8,7 @@ Do not implement the stages in one pull request. A red eval would not say which 
 
 ## Operation
 
-The order is the order in [retrieval-improvement-plan.md](retrieval-improvement-plan.md). Step 1 is the re-index with `mongodb/voyage-code-4`. Hybrid search is step 2, and it runs on that new index. The reranker text test is step 3. Do not run hybrid search on `repotron-staging-chunks`. That index is deleted in step 1.
+The order is the order in [retrieval-improvement-plan.md](retrieval-improvement-plan.md). Step 1 deletes `repotron-staging-chunks` and creates it again at 1024 dimensions, then re-indexes with `mongodb/voyage-code-4`. Hybrid search is step 2. The reranker text test is step 3. Do not run hybrid search before that re-index.
 
 **Read first, in this order:**
 
@@ -162,7 +162,7 @@ The query reads `chunk_keywords` for that symbol in that index. The limit is 50 
 
 ## 4. What stays
 
-- The live embedding model is `@cf/google/embeddinggemma-2` until step 1 of [retrieval-improvement-plan.md](retrieval-improvement-plan.md). That step replaces it with `mongodb/voyage-code-4` and deletes `repotron-staging-chunks`.
+- The live embedding model is `@cf/google/embeddinggemma-2` until step 1 of [retrieval-improvement-plan.md](retrieval-improvement-plan.md). That step deletes `repotron-staging-chunks`, creates it again at 1024 dimensions, and fills it with `mongodb/voyage-code-4`.
 - The answer model stays `anthropic/claude-haiku-5.5`.
 - `CONTEXT_CHUNKS` stays 8.
 - The preview Worker name stays `repotron-pr-<number>-gateway`. The rate limiter stays on `repotron-staging-gateway`.
