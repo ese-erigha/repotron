@@ -212,7 +212,7 @@ The production path stays dense.
 
 ### Stage 5: Measure the reranker
 
-The production path stays hybrid without rerank.
+**Status.** Twenty golden pairs were scored with `@cf/baai/bge-reranker-base`. The low score is 0.0004465289821382612. The high score is 0.9927901029586792. Every score is between 0 and 1, so the gateway does not apply a sigmoid. The production path stays the semantic top 8.
 
 - Call `bge-reranker-base` on 20 golden pairs.
 - Write `apps/evals/reranker-scores.md` with the low score, the high score, and the sigmoid decision.
