@@ -236,9 +236,9 @@ These are targets. Measure them on staging.
 
 [phase-2-plan.md](phase-2-plan.md) holds the delivery stages.
 
-- [ ] Add the golden set: 3 repositories at fixed commits, and 60 questions at least.
-- [ ] Add the retrieval metrics and the LLM-judge metrics.
-- [ ] Write the first baseline file. Fail a pull request that drops more than 2 percentage points.
+- [x] Add the golden set. Three repositories are pinned to fixed commits. Sixty questions are written. The run asks 30. The other 30 stay in `golden/hold/`.
+- [x] Add the retrieval metrics and the LLM-judge metrics.
+- [x] Write `baseline.json`. A pull request fails when one of the six scores drops by more than 0.02.
 
 ### Phase 3: Hybrid retrieval
 

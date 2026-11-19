@@ -15,7 +15,7 @@ Run the steps in order. One step is one pull request. Stop a step when its check
 1. Add one keyword chunk. Keep the semantic top 8 in their current order, including the symbol move for a "where is" question. Call `keywordSearch` with a limit of 50. When the best keyword chunk is not already in the 8, append it. The model receives 9 chunks. Do not drop a semantic chunk. Merge only when recall stays at 0.7407 and `identifierHitAt1` stays at 1.0. When recall drops, stop. Do not try another swap inside the 8.
 2. Change the reranker text. Do not sort the live answer list. Score the same 20 ground-truth pairs with `@cf/baai/bge-reranker-base`. Send the symbol name, not the full question, and keep the chunk title in the passage. Record the low score, the high score, and the sigmoid decision in `apps/evals/reranker-scores.md`. The check passes when the lowest definition score is above the readme score for "What is Flask?" (0.9927901029586792 on the titled passage). When a definition still scores lower, try one more text, the question "Where is {symbol} defined?". When that also fails, stop. Do not turn the sort on.
 3. Turn the reranker on only after step 2 passes. Sort the 9 chunks by the reranker score. On a "where is" question, the symbol-matched chunk stays first. Merge only when recall stays at 0.7407, `identifierHitAt1` stays at 1.0, and retrieval p95 stays under 800 ms.
-4. Compare BM25 alone with semantic search alone on the 30 questions, split by question kind. Write the scores in `apps/evals/ablation.json`. Re-index only when BM25 wins both the identifier kind and the concept kind. The re-index is a new Vectorize index, one new embedding model, and a fresh index of the three pinned commits. It is not a reload of the current vectors. A new baseline comes after that index is `ready`. When BM25 does not win both kinds, do not re-index.
+4. Re-index the three pinned commits with a code embedding model and replace `repotron-staging-chunks`. The model list and the default, `mongodb/voyage-code-4` at 1024 dimensions, are in [retrieval-improvement-plan.md](retrieval-improvement-plan.md). Do not write the new vectors into the old index. Delete the old index after the new index is `ready` and the 30 questions have run. The symbol move stays. Then score BM25 alone and semantic search alone, split by question kind, and write `apps/evals/ablation.json`.
 
 **Read first, in this order:**
 
@@ -53,7 +53,7 @@ Run the steps in order. One step is one pull request. Stop a step when its check
 
 **Out of scope.**
 
-- A new embedding model before step 4 of the operation. Step 4 is the only step that may re-index. The home page indexes the tip of the default branch, not a chosen SHA, so the re-index uses the three pinned commits.
+- A second embedding model besides the code model in step 4 of the operation. That step replaces `repotron-staging-chunks`. The model list is in [retrieval-improvement-plan.md](retrieval-improvement-plan.md). The re-index uses the three pinned commits, not the branch tip.
 - A new answer model.
 - A change to chunking. `CONTEXT_CHUNKS` stays 8 for the semantic list. The hybrid priority may add one keyword chunk beyond those 8.
 - The public dashboard and storing reports in R2 (Phase 4).
@@ -169,7 +169,7 @@ The query reads `chunk_keywords` for that symbol in that index. The limit is 50 
 
 ## 4. What stays
 
-- The embedding model stays `@cf/google/embeddinggemma-2`.
+- The live embedding model is `@cf/google/embeddinggemma-2` until step 4 of the operation. That step replaces it with `mongodb/voyage-code-4` and deletes `repotron-staging-chunks`.
 - The answer model stays `anthropic/claude-haiku-5.5`.
 - `CONTEXT_CHUNKS` stays 8.
 - The preview Worker name stays `repotron-pr-<number>-gateway`. The rate limiter stays on `repotron-staging-gateway`.

@@ -269,11 +269,11 @@ D1 stops at 10 GB for one database. The 30-day cleanup keeps the chunk text unde
 
 AI Gateway fronts each model call. It records the model id, the tokens, and the latency for the `answered_questions` row.
 
-- **Embeddings.** Phase 1 starts with the Workers AI model `@cf/google/embeddinggemma-2`. It covers code, gives 768 dimensions, and has an 8,192-token context window.
+- **Embeddings.** The live index uses Workers AI `@cf/google/embeddinggemma-2`. It is a general text model. It gives 768 dimensions and has an 8,192-token context window. It does not replace a code embedding model. The replacement index uses `mongodb/voyage-code-4` at 1024 dimensions and then deletes `repotron-staging-chunks`. The model list is in [retrieval-improvement-plan.md](retrieval-improvement-plan.md).
   - The model id is the constant `EMBEDDING_MODEL_ID` in `packages/domain`, not a Worker var. The gateway and the pipeline must use the same model, and the Vectorize dimension depends on it.
   - The model expects task prefixes. A question becomes `task: search result | query: <question>`. A chunk uses the `title` and `text` form in the chunk rules.
   - One request allows 8,192 tokens. That limit is the sum of every text in the request. `EMBED_BATCH_SIZE` is 1, so one chunk at the 1,500-token cap stays under that limit. `EMBED_CONCURRENCY` is 10, so ten calls run at the same time.
-  - Phase 3 compares it with `voyage-code-3` and `text-embedding-3-small` through AI Gateway. Each candidate fits the Vectorize limit of 1536 dimensions.
+  - The code models are `voyage-code-4` and `voyage-code-3` on the Voyage API, and `mongodb/voyage-code-4` on OpenRouter. `voyage-code-3` is not an OpenRouter id. The default is `mongodb/voyage-code-4`.
 - **Reranker.** Phase 3 starts with Workers AI `bge-reranker-base`. The ablation compares it with Cohere Rerank through AI Gateway.
 - **Answer model.** OpenRouter model `anthropic/claude-haiku-5.5`, through the AI Gateway OpenRouter route. Stream the tokens. Temperature 0. The Worker var is `ANSWER_MODEL_ID`. The gateway calls it with `fetch`, with no SDK.
   - Set `reasoning.effort` to `none`. Thinking is on by default. Thinking tokens delay the first answer token and add to the output bill.
