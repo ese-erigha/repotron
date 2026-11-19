@@ -47,33 +47,40 @@ OpenRouter rerankers:
 
 ## Re-index
 
-Steps 1 and 2 do not re-index. The keyword table is full. The three golden commits already have vectors in `repotron-staging-chunks`.
+Step 1 is the re-index. Hybrid search and the reranker wait until that index exists. The semantic half of hybrid search reads the vectors. Those vectors come from `@cf/google/embeddinggemma-2`. A hybrid test on that index would be thrown away with the index.
 
-Step 3 does re-index. A reload of the current vectors is not that step. The current model, `@cf/google/embeddinggemma-2`, writes one vector space. A new model, or a new embedding text, is a new space. Old vectors cannot be compared with new vectors.
-
-The re-index uses the pinned commits in `apps/evals/golden/*.yaml`. It does not use the tip of the default branch. The home page still indexes the branch tip for a visitor. The golden re-index is a separate run that passes the commit SHA into the existing workflow.
+The keyword table does not depend on the embedding model. It stays. The re-index uses the pinned commits in `apps/evals/golden/*.yaml`. It does not use the tip of the default branch. The home page still indexes the branch tip for a visitor. The golden re-index passes the commit SHA into the existing workflow.
 
 ## Steps
 
 One step is one pull request. Stop when the check fails. Do not hide a failure by starting the next step.
 
-1. Hybrid search. Give the model the 8 semantic chunks plus one keyword chunk. Do not reorder the 8, and do not delete one of them.
+1. Re-index. Replace the general-purpose vectors before any hybrid test.
+   - Create a new Vectorize index with 1024 dimensions.
+   - Embed the three pinned commits with `mongodb/voyage-code-4`.
+   - The embedding text is `title: path symbol | text: content`, plus the first docstring or the signature when the chunk has one.
+   - Point the gateway and the pipeline at the new index.
+   - Keep the symbol move.
+   - Run the 30 questions on semantic search plus the symbol move.
+   - Record the new recall and the new `identifierHitAt1`. Those two numbers are the floor for steps 2 and 4.
+   - Delete `repotron-staging-chunks` after that run has a recorded score.
+2. Hybrid search. Do this on the new index only. Give the model the 8 semantic chunks plus one keyword chunk. Do not reorder the 8, and do not delete one of them.
    - Run semantic search for the top 8, then the symbol move. A "where is" question still puts the named function first.
    - Run keyword search for the top 50.
    - If the first keyword chunk is already inside the 8, stop. The model receives those 8.
    - If it is not inside the 8, add it at the end. The model receives 9 chunks.
-   - Run the 30 questions. Merge only when recall is 0.7407 and `identifierHitAt1` is 1.0.
+   - Run the 30 questions. Merge only when recall and `identifierHitAt1` stay at the floor from step 1.
    - If recall drops, stop this step. Do not put the keyword chunk into one of the original 8 slots. That swap already failed.
-2. Reranker text. Find a question string that makes a definition score higher than a readme. Do not change the order of chunks a user receives.
-   - Use the same 20 questions and the same ground-truth chunks as `apps/evals/reranker-scores.md`.
+3. Reranker text. Find a question string that makes a definition score higher than a readme. Do not change the order of chunks a user receives.
+   - Use the same 20 questions and the ground-truth chunks from the new index.
    - Call `@cf/baai/bge-reranker-base`. The passage is `title: path symbol | text: content`.
    - First query text: the symbol name only. For the Hono class, that text is `Hono`.
    - Write the low score, the high score, and the sigmoid decision in `apps/evals/reranker-scores.md`.
-   - Pass when every definition score is above 0.9927901029586792. That number is the titled-passage score for "What is Flask?".
+   - Pass when every definition score is above the readme score for "What is Flask?" on this same run.
    - If a definition is still lower, run the 20 pairs once more. The query text is `Where is {symbol} defined?`.
    - If that run also fails, leave `bge-reranker-base` unused for sorting. Step 4 then tries `mongodb/rerank-3`.
 3. Re-index the three pinned commits with `mongodb/voyage-code-4` at 1024 dimensions. Create a new Vectorize index and point the gateway and the pipeline at it. Delete `repotron-staging-chunks` after the new index is `ready` and the 30 questions have run. The embedding text stays `title: path symbol | text: content`, and it adds the first docstring or the signature when the chunk has one. The raw code stays in `chunk_keywords`. The symbol move stays. Record the new recall and the new `identifierHitAt1` as the floor for later steps.
-4. Choose the reranker on the index that step 3 kept. If step 2 passed, use `@cf/baai/bge-reranker-base`. If step 2 failed, score the same 20 pairs with `mongodb/rerank-3` and apply the same definition-versus-readme check. Sort the chunks only after that check passes. On a "where is" question, the symbol-matched chunk stays first. Merge only when recall stays at the new floor from step 3, `identifierHitAt1` stays at 1.0, and retrieval p95 stays under 800 ms.
+4. Choose the reranker on the new index. If step 3 passed, use `@cf/baai/bge-reranker-base`. If step 3 failed, score the same 20 pairs with `mongodb/rerank-3` and apply the same definition-versus-readme check. Sort the chunks only after that check passes. On a "where is" question, the symbol-matched chunk stays first. Merge only when recall and `identifierHitAt1` stay at the floor from step 1, and retrieval p95 stays under 800 ms.
 5. Write the comparison. Score keyword search alone, semantic search alone, semantic search plus the extra keyword chunk, and that list after the reranker. Use the 30 questions. Split the scores by question kind. Commit the file as `apps/evals/ablation.json`. Do not change the production path in this pull request.
 
 ## What this plan refuses

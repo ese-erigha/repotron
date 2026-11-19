@@ -8,14 +8,7 @@ Do not implement the stages in one pull request. A red eval would not say which 
 
 ## Operation
 
-Do not re-index for steps 1 and 2. `chunk_keywords` is already filled. The vectors for the three golden commits are already in `repotron-staging-chunks`. A re-index does not change those rows. Re-index only in step 4, and only when that step says to.
-
-Run the steps in order. One step is one pull request. Stop a step when its check fails. Do not start the next step to hide that failure.
-
-1. Add one keyword chunk. Keep the semantic top 8 in their current order, including the symbol move for a "where is" question. Call `keywordSearch` with a limit of 50. When the best keyword chunk is not already in the 8, append it. The model receives 9 chunks. Do not drop a semantic chunk. Merge only when recall stays at 0.7407 and `identifierHitAt1` stays at 1.0. When recall drops, stop. Do not try another swap inside the 8.
-2. Change the reranker text. Do not sort the live answer list. Score the same 20 ground-truth pairs with `@cf/baai/bge-reranker-base`. Send the symbol name, not the full question, and keep the chunk title in the passage. Record the low score, the high score, and the sigmoid decision in `apps/evals/reranker-scores.md`. The check passes when the lowest definition score is above the readme score for "What is Flask?" (0.9927901029586792 on the titled passage). When a definition still scores lower, try one more text, the question "Where is {symbol} defined?". When that also fails, stop. Do not turn the sort on.
-3. Turn the reranker on only after step 2 passes. Sort the 9 chunks by the reranker score. On a "where is" question, the symbol-matched chunk stays first. Merge only when recall stays at 0.7407, `identifierHitAt1` stays at 1.0, and retrieval p95 stays under 800 ms.
-4. Re-index the three pinned commits with a code embedding model and replace `repotron-staging-chunks`. The model list and the default, `mongodb/voyage-code-4` at 1024 dimensions, are in [retrieval-improvement-plan.md](retrieval-improvement-plan.md). Do not write the new vectors into the old index. Delete the old index after the new index is `ready` and the 30 questions have run. The symbol move stays. Then score BM25 alone and semantic search alone, split by question kind, and write `apps/evals/ablation.json`.
+The order is the order in [retrieval-improvement-plan.md](retrieval-improvement-plan.md). Step 1 is the re-index with `mongodb/voyage-code-4`. Hybrid search is step 2, and it runs on that new index. The reranker text test is step 3. Do not run hybrid search on `repotron-staging-chunks`. That index is deleted in step 1.
 
 **Read first, in this order:**
 
@@ -53,7 +46,7 @@ Run the steps in order. One step is one pull request. Stop a step when its check
 
 **Out of scope.**
 
-- A second embedding model besides the code model in step 4 of the operation. That step replaces `repotron-staging-chunks`. The model list is in [retrieval-improvement-plan.md](retrieval-improvement-plan.md). The re-index uses the three pinned commits, not the branch tip.
+- A second embedding model besides the code model in step 1 of [retrieval-improvement-plan.md](retrieval-improvement-plan.md). That step replaces `repotron-staging-chunks`. The model list is in that file. The re-index uses the three pinned commits, not the branch tip.
 - A new answer model.
 - A change to chunking. `CONTEXT_CHUNKS` stays 8 for the semantic list. The hybrid priority may add one keyword chunk beyond those 8.
 - The public dashboard and storing reports in R2 (Phase 4).
@@ -169,7 +162,7 @@ The query reads `chunk_keywords` for that symbol in that index. The limit is 50 
 
 ## 4. What stays
 
-- The live embedding model is `@cf/google/embeddinggemma-2` until step 4 of the operation. That step replaces it with `mongodb/voyage-code-4` and deletes `repotron-staging-chunks`.
+- The live embedding model is `@cf/google/embeddinggemma-2` until step 1 of [retrieval-improvement-plan.md](retrieval-improvement-plan.md). That step replaces it with `mongodb/voyage-code-4` and deletes `repotron-staging-chunks`.
 - The answer model stays `anthropic/claude-haiku-5.5`.
 - `CONTEXT_CHUNKS` stays 8.
 - The preview Worker name stays `repotron-pr-<number>-gateway`. The rate limiter stays on `repotron-staging-gateway`.
@@ -215,7 +208,7 @@ The production path stays dense.
 
 ### Stage 4: Turn on hybrid search
 
-**Status.** Priority. Follow step 1 of the operation. A normal question still uses the semantic top 8 until that pull request merges. The last-slot swap dropped recall from 0.7407 to 0.7037. Do not merge unless identifier hit@1 is above 0.5.
+**Status.** Priority. This is step 2 of [retrieval-improvement-plan.md](retrieval-improvement-plan.md). It starts after the code-model index replaces `repotron-staging-chunks`. Do not merge unless identifier hit@1 stays at the floor from that re-index.
 
 - Call `semanticSearch` with a limit of 8.
 - Move the named symbol to position 1 when the question starts with "where is".
@@ -234,7 +227,7 @@ The production path stays dense.
 
 ### Stage 6: Turn on rerank and the labels
 
-**Status.** Priority. Follow steps 2 and 3 of the operation. The plain passage and the titled passage both score definitions near 0 and concept passages near 1. The sort stays off until step 2 passes. The production path stays the semantic top 8 until step 3.
+**Status.** Priority. This is steps 3 and 4 of [retrieval-improvement-plan.md](retrieval-improvement-plan.md). The sort stays off until a definition scores above a readme. The production path stays semantic search plus the symbol move until that check passes.
 
 - Rerank the top 50 fused chunks. Keep 8.
 - Attach high, medium, or low to each citation in the retrieval event and in the saved citation JSON.
