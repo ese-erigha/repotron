@@ -1,4 +1,4 @@
-import { RRF_K } from './limits.ts'
+import { CONTEXT_CHUNKS, RRF_K } from './limits.ts'
 
 const CAMEL_PART = /[A-Z]?[a-z]+|[A-Z]+(?![a-z])|\d+/g
 
@@ -60,6 +60,14 @@ export function keywordMatch(question: string): string {
     }
   }
   return terms.join(' OR ')
+}
+
+export function promoteKeywordHit(vectorIds: string[], keywordIds: string[]): string[] {
+  const head = vectorIds.slice(0, CONTEXT_CHUNKS)
+  const keywordHit = keywordIds[0]
+  if (!keywordHit || !vectorIds.includes(keywordHit)) return head
+  const rest = head.filter((id) => id !== keywordHit)
+  return [keywordHit, ...rest].slice(0, CONTEXT_CHUNKS)
 }
 
 export function fuseRanks(denseIds: string[], keywordIds: string[]): string[] {

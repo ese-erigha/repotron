@@ -2,8 +2,8 @@ import {
   CONTEXT_CHUNKS,
   EMBEDDING_MODEL_ID,
   formatQueryInput,
-  fuseRanks,
   keywordMatch,
+  promoteKeywordHit,
   RETRIEVAL_TOP_K,
 } from 'repotron-domain'
 import type { SourceChunkRecord } from 'db'
@@ -25,8 +25,7 @@ export async function retrieveHybridChunks(indexId: string, question: string): P
     vectorIds(indexId, question, RETRIEVAL_TOP_K),
     keywordIds(indexId, question),
   ])
-  const fused = fuseRanks(dense, keywords).slice(0, CONTEXT_CHUNKS)
-  return rowsInOrder(indexId, fused)
+  return rowsInOrder(indexId, promoteKeywordHit(dense, keywords))
 }
 
 async function vectorIds(indexId: string, question: string, topK: number): Promise<string[]> {

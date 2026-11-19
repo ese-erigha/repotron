@@ -4,7 +4,7 @@ import { describe, it } from 'node:test'
 
 import { buildContract } from './contract.ts'
 import { formatChunkInput, formatQueryInput } from './formats.ts'
-import { fuseRanks, keywordMatch } from './keywords.ts'
+import { fuseRanks, keywordMatch, promoteKeywordHit } from './keywords.ts'
 import { buildGithubLineUrl, parseRepositoryLink } from './links.ts'
 import { readCitedNumbers } from './citations.ts'
 
@@ -48,6 +48,27 @@ describe('keywordMatch', () => {
     assert.equal(match.includes('"function"'), true)
     assert.equal(match.includes('"defined"'), true)
     assert.equal(match.includes('"the"'), false)
+  })
+})
+
+describe('promoteKeywordHit', () => {
+  it('when the first keyword chunk is outside the vector list, then the result keeps the vector order', () => {
+    const ids = promoteKeywordHit(['v1', 'v2', 'v3'], ['k1'])
+
+    assert.deepEqual(ids, ['v1', 'v2', 'v3'])
+  })
+
+  it('when the first keyword chunk is below the vector head, then it moves to the front', () => {
+    const vector = ['v1', 'v2', 'v3', 'v4', 'v5', 'v6', 'v7', 'v8', 'v9']
+    const ids = promoteKeywordHit(vector, ['v9'])
+
+    assert.deepEqual(ids, ['v9', 'v1', 'v2', 'v3', 'v4', 'v5', 'v6', 'v7'])
+  })
+
+  it('when the first keyword chunk is already in the vector head, then the result has no duplicate', () => {
+    const ids = promoteKeywordHit(['v1', 'v2', 'v3'], ['v3'])
+
+    assert.deepEqual(ids, ['v3', 'v1', 'v2'])
   })
 })
 

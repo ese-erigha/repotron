@@ -56,7 +56,8 @@ Question
   embed the question
   Vectorize top 50 in the index namespace
   BM25 top 50 from chunk_keywords for that index
-  fuse the two lists with RRF
+  keep the vector top 8
+  move the keyword rank-1 chunk to the front when it is in the vector top 50
   rerank the top 50
   keep the top 8
   label each kept chunk
@@ -68,7 +69,7 @@ Symbol trace
   no model call
 ```
 
-Until the rerank stage, the model still receives 8 chunks. Those 8 are the head of the fused list. The candidate pool is 50. The answer path does not grow to 50 chunks.
+Until the rerank stage, the model still receives 8 chunks. Those 8 are the vector top 8. The keyword rank-1 chunk moves to position 1 when that chunk is also in the vector top 50. The answer path does not grow to 50 chunks.
 
 ---
 
@@ -116,9 +117,11 @@ The migration creates this table, the insert trigger, the delete trigger, and on
 
 The backfill covers the three golden indexes that are already `ready`. A question must not depend on a re-index.
 
-### Decision D: RRF uses rank 1 as the best rank
+### Decision D: The final 8 stay in vector order
 
-`score(chunk) = Σ 1 / (60 + rank)`. Rank starts at 1. A chunk that appears in only one list gets one term. `RRF_K` is 60. `RETRIEVAL_TOP_K` is 50. Both constants live in `packages/domain`. The final list length stays `CONTEXT_CHUNKS`, which is 8.
+The question path keeps the vector top 8. The keyword rank-1 chunk moves to position 1 when that chunk is also in the vector top 50. When that chunk is outside the vector list, the vector order stays. The list length stays `CONTEXT_CHUNKS`, which is 8.
+
+`fuseRanks` still computes `score(chunk) = Σ 1 / (60 + rank)`. Rank starts at 1. `RRF_K` is 60. `RETRIEVAL_TOP_K` is 50. The question path does not use that score to choose the 8.
 
 ### Decision E: The reranker is measured before it serves traffic
 
@@ -201,10 +204,11 @@ The production path stays dense.
 
 ### Stage 4: Turn on hybrid search
 
-**Status.** A normal question fuses the top 50 vector hits with the top 50 keyword hits and keeps 8. The eval token can still request `retrieval=dense` or `retrieval=bm25`. Do not merge unless identifier hit@1 is above 0.5.
+**Status.** A normal question keeps the vector top 8. The keyword rank-1 chunk moves to position 1 when that chunk is also in the vector top 50. The eval token can still request `retrieval=dense` or `retrieval=bm25`. Do not merge unless identifier hit@1 is above 0.5.
 
-- Fuse the dense top 50 and the BM25 top 50 with RRF.
-- Give the model the first 8 fused chunks.
+- Take the vector top 50 and the keyword top 50.
+- Give the model the vector top 8.
+- Move the keyword rank-1 chunk to position 1 when it is inside the vector top 50.
 - This is the production path.
 - **Staging check:** the required eval check is green. The printed identifier hit@1 is higher than the dense number from stage 1. When hit@1 is not higher, do not merge.
 
