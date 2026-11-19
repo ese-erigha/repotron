@@ -53,7 +53,7 @@ export {
 export { buildChunkId, buildGithubLineUrl, buildIndexId, parseRepositoryLink } from './links.ts'
 export type { GithubLineLink, RepositoryLink } from './links.ts'
 export { formatChunkInput, formatQueryInput } from './formats.ts'
-export { RETRIEVAL_MODE, fuseRanks, keywordMatch, promoteSymbolHit } from './keywords.ts'
+export { RETRIEVAL_MODE, blendSearches, fuseRanks, keywordMatch, promoteSymbolHit } from './keywords.ts'
 export { readCitedNumbers } from './citations.ts'
 export {
   chunkKindSchema,

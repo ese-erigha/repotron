@@ -1,9 +1,9 @@
 import {
-  CONTEXT_CHUNKS,
+  blendSearches,
   EMBEDDING_MODEL_ID,
   formatQueryInput,
   keywordMatch,
-  promoteSymbolHit,
+  RETRIEVAL_TOP_K,
 } from 'repotron-domain'
 import type { SourceChunkRecord } from 'db'
 
@@ -25,10 +25,11 @@ export async function keywordSearch(input: SearchInput): Promise<SourceChunkReco
   return rowsInOrder(input.indexId, ids)
 }
 
-export async function retrieveAnswerChunks(indexId: string, question: string): Promise<SourceChunkRecord[]> {
-  const search: SearchInput = { indexId, question, limit: CONTEXT_CHUNKS }
-  const chunks = await semanticSearch(search)
-  return promoteSymbolHit(chunks, question)
+export async function hybridSearch(indexId: string, question: string): Promise<SourceChunkRecord[]> {
+  const semanticInput: SearchInput = { indexId, question, limit: RETRIEVAL_TOP_K }
+  const keywordInput: SearchInput = { indexId, question, limit: RETRIEVAL_TOP_K }
+  const [semantic, keyword] = await Promise.all([semanticSearch(semanticInput), keywordSearch(keywordInput)])
+  return blendSearches(semantic, keyword, question)
 }
 
 async function vectorIds(indexId: string, question: string, topK: number): Promise<string[]> {
