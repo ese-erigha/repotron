@@ -312,8 +312,8 @@ Python 3.12, managed with uv. CI runs it against the staging gateway. Phase 2 de
 3. Phase 3: run the hybrid path instead.
    1. Embed the question. Query Vectorize with `topK` 50 and the scope filters.
    2. Query `chunk_keywords` with BM25 for the top 50. Quote each term of the question and join the terms with `OR`.
-   3. Fuse the two lists with RRF: `score(chunk) = Σ 1 / (60 + rank)`, one term for each list.
-   4. Send the top 50 fused chunks to the reranker. Keep the top 8.
+   3. Keep the vector top 8. When the keyword rank-1 chunk is inside the vector top 50, move that chunk to position 1.
+   4. A later stage sends candidates to the reranker and keeps the top 8.
    5. Give each kept chunk a confidence label from its reranker score. Refer to the confidence rules below.
 4. Load the chunk rows from D1 and send the `retrieval` event.
 5. Build the prompt from the answer contract in the PRD.
