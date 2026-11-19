@@ -2,6 +2,46 @@ import { RRF_K } from './limits.ts'
 
 const CAMEL_PART = /[A-Z]?[a-z]+|[A-Z]+(?![a-z])|\d+/g
 
+const CLOSED_CLASS_WORDS = new Set<string>([
+  'a',
+  'an',
+  'another',
+  'the',
+  'is',
+  'are',
+  'was',
+  'were',
+  'be',
+  'do',
+  'does',
+  'did',
+  'of',
+  'to',
+  'in',
+  'on',
+  'for',
+  'from',
+  'into',
+  'with',
+  'and',
+  'or',
+  'but',
+  'where',
+  'how',
+  'what',
+  'when',
+  'who',
+  'why',
+  'which',
+  'this',
+  'that',
+  'these',
+  'those',
+  'it',
+  'its',
+  'i',
+])
+
 export const RETRIEVAL_MODE = {
   dense: 'dense',
   bm25: 'bm25',
@@ -12,6 +52,7 @@ export function keywordMatch(question: string): string {
   const terms: string[] = []
   const seen = new Set<string>()
   for (const word of question.match(/[A-Za-z0-9_-]+/g) ?? []) {
+    if (CLOSED_CLASS_WORDS.has(word.toLowerCase())) continue
     for (const term of keywordTerms(word)) {
       if (seen.has(term)) continue
       seen.add(term)
