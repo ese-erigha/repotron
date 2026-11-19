@@ -57,7 +57,7 @@ Phase 1 uses this path.
 These steps are not in the first version.
 
 - **Phase 2.** A fixed question set scores each change. The score covers retrieval, faithfulness, and cost.
-- **Phase 3.** Keyword search joins the number search. A reranker, Workers AI `bge-reranker-base`, scores the top 50 chunks and keeps the best 8 for the answer model.
+- **Phase 3.** Keyword search joins the number search. A reranker, OpenRouter `mongodb/rerank-3`, scores the top 50 chunks and keeps the best 8 for the answer model.
   - The user can limit a question to a language or a folder.
   - Each citation shows a confidence label: high, medium, or low.
   - A symbol trace lists where a name is defined, then where the code uses it. That trace calls no model.

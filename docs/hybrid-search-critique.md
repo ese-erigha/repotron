@@ -35,7 +35,7 @@ The note assumes a naive stack. These parts are already built.
 
 ## Where the note is out of this phase
 
-- A code embedding model needs `repotron-staging-chunks` deleted and created again at 1024 dimensions. That re-index is step 1 of [retrieval-improvement-plan.md](retrieval-improvement-plan.md). The default model is `mongodb/voyage-code-4`. The home page still indexes the branch tip for a visitor. The golden re-index passes the pinned commit SHA.
+- A code embedding model needs the staging rows cleared and `repotron-staging-chunks` created again at 1024 dimensions. That work is step 1 of [retrieval-improvement-plan.md](retrieval-improvement-plan.md). The code pull request is step 2, and it does not run the 30-question eval. The re-index model is `mongodb/voyage-code-4`.
 - Embedding a generated summary, and keeping raw code only in BM25, is a second index. It is a re-embed of every chunk. It is not a fusion tweak. A summary that omits the symbol can miss "where is" questions. The symbol column already carries that name.
 - Cohere Rerank and `bge-reranker-v2-m3` are different models. Each one needs its own score range before it sorts a list. The measured model is `bge-reranker-base`.
 
@@ -44,7 +44,7 @@ The note assumes a naive stack. These parts are already built.
 Hybrid search and the reranker stay first. Do not treat scope filters or the symbol trace as the next search change.
 
 1. Hybrid search. Keep the semantic top 8. Add the best keyword chunk as a 9th chunk. Do not remove a semantic chunk. Merge only when recall stays at 0.7407 and `identifierHitAt1` stays at 1.0.
-2. Reranker. Change the text sent to `bge-reranker-base` until a definition scores above a readme on the same 20 pairs. The sort stays off until that is true. Record the new low score, the new high score, and the sigmoid decision in `apps/evals/reranker-scores.md`.
+2. Reranker. Score the 20 pairs with `mongodb/rerank-3`. The sort stays off until a definition scores above a readme. Record the low score, the high score, and the sigmoid decision in `apps/evals/reranker-scores.md`.
 3. Diagnostic, after those two. Score BM25 alone and semantic search alone on the 30 questions, split by question kind. Do not remove semantic search unless BM25 wins both the identifier kind and the concept kind.
 
 ## The recommendation, unchanged
