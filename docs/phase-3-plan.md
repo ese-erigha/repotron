@@ -201,6 +201,8 @@ The production path stays dense.
 
 ### Stage 4: Turn on hybrid search
 
+**Status.** A normal question fuses the top 50 vector hits with the top 50 keyword hits and keeps 8. The eval token can still request `retrieval=dense` or `retrieval=bm25`. Do not merge unless identifier hit@1 is above 0.5.
+
 - Fuse the dense top 50 and the BM25 top 50 with RRF.
 - Give the model the first 8 fused chunks.
 - This is the production path.

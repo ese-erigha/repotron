@@ -4,7 +4,7 @@ import { describe, it } from 'node:test'
 
 import { buildContract } from './contract.ts'
 import { formatChunkInput, formatQueryInput } from './formats.ts'
-import { keywordMatch } from './keywords.ts'
+import { fuseRanks, keywordMatch } from './keywords.ts'
 import { buildGithubLineUrl, parseRepositoryLink } from './links.ts'
 import { readCitedNumbers } from './citations.ts'
 
@@ -38,6 +38,14 @@ describe('keywordMatch', () => {
     assert.equal(match.includes('"by"'), true)
     assert.equal(match.includes('"id"'), true)
     assert.equal(match.includes('9-abc'), false)
+  })
+})
+
+describe('fuseRanks', () => {
+  it('when a chunk is first in both lists, then it ranks above a chunk from one list', () => {
+    const fused = fuseRanks(['both', 'dense-only'], ['both', 'keyword-only'])
+
+    assert.deepEqual(fused, ['both', 'dense-only', 'keyword-only'])
   })
 })
 

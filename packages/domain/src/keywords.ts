@@ -1,7 +1,11 @@
+import { RRF_K } from './limits.ts'
+
 const CAMEL_PART = /[A-Z]?[a-z]+|[A-Z]+(?![a-z])|\d+/g
 
 export const RETRIEVAL_MODE = {
+  dense: 'dense',
   bm25: 'bm25',
+  hybrid: 'hybrid',
 } as const
 
 export function keywordMatch(question: string): string {
@@ -15,6 +19,23 @@ export function keywordMatch(question: string): string {
     }
   }
   return terms.join(' OR ')
+}
+
+export function fuseRanks(denseIds: string[], keywordIds: string[]): string[] {
+  const scores = new Map<string, number>()
+  addRanks(scores, denseIds)
+  addRanks(scores, keywordIds)
+  return [...scores.entries()]
+    .sort((left, right) => right[1] - left[1])
+    .map(([id]) => id)
+}
+
+function addRanks(scores: Map<string, number>, ids: string[]): void {
+  ids.forEach((id, index) => {
+    const rank = index + 1
+    const score = 1 / (RRF_K + rank)
+    scores.set(id, (scores.get(id) ?? 0) + score)
+  })
 }
 
 function keywordTerms(word: string): string[] {
