@@ -19,8 +19,10 @@ export async function storeBatch(indexId: string, key: string, chunkTotal: numbe
 
 async function storeWave(indexId: string, chunks: Chunk[], chunkTotal: number): Promise<string> {
   const rows = chunks.map((chunk) => toChunkRow(indexId, chunk))
-  await getRepositories().sourceChunks.insertBatch(rows)
-  const vectors = await embedTexts(chunks.map((chunk) => formatChunkInput(chunk.header, chunk.content)))
+  const [, vectors] = await Promise.all([
+    getRepositories().sourceChunks.insertBatch(rows),
+    embedTexts(chunks.map((chunk) => formatChunkInput(chunk.header, chunk.content))),
+  ])
   const upserts = chunks.map((chunk, index) => toVector(indexId, chunk, vectors[index]))
   // Vectorize stamps the mutation before this call returns. A later time stays ahead of that stamp.
   const upsertedAt = new Date().toISOString()

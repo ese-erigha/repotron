@@ -36,11 +36,12 @@ export async function askQuestion(input: AskQuestionInput): Promise<ReadableStre
   if (!repository) throw new RequestError(404, ERROR_CODE.notFound, 'The index does not exist.')
   const question = questionText(input.body)
   const preset = 'preset' in input.body ? input.body.preset : null
-  const chunks = await retrieveQuestionChunks(input, row.id, question)
-  const paths =
+  const [chunks, paths] = await Promise.all([
+    retrieveQuestionChunks(input, row.id, question),
     preset === PRESET.startHere
-      ? await getRepositories().sourceChunks.listPaths({ indexId: row.id, limit: START_HERE_MAX_PATHS })
-      : []
+      ? getRepositories().sourceChunks.listPaths({ indexId: row.id, limit: START_HERE_MAX_PATHS })
+      : Promise.resolve([]),
+  ])
   return openAnswerStream({
     index: {
       id: row.id,
