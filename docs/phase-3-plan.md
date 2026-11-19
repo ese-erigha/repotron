@@ -54,8 +54,11 @@ Phase 2 already scores the golden set against a preview of the pull request's ga
 ```text
 Question
   embed the question
-  Vectorize top 8 in the index namespace
+  semantic search top 50
+  keyword search top 50
+  keep the semantic top 8
   when the question starts with "where is", move the chunk whose symbol is the last name to the front
+  when the best keyword chunk is also in the semantic top 50 but outside the top 8, put it in the last slot
   rerank the top 50
   keep the top 8
   label each kept chunk
@@ -67,7 +70,7 @@ Symbol trace
   no model call
 ```
 
-Until the rerank stage, the model still receives the vector top 8. A question that starts with "where is" moves the chunk whose symbol equals the last name to position 1. A role word such as "function" or "decorator" is not a name. The chunk set stays the vector set.
+Until the rerank stage, the model receives 8 chunks. The first slots are the semantic top 8. A "where is" question moves the named symbol to position 1. The best keyword chunk takes the last slot only when semantic search also returned that chunk outside the top 8. A keyword-only chunk stays out.
 
 ---
 
@@ -115,9 +118,11 @@ The migration creates this table, the insert trigger, the delete trigger, and on
 
 The backfill covers the three golden indexes that are already `ready`. A question must not depend on a re-index.
 
-### Decision D: A where-is question promotes the named symbol
+### Decision D: Hybrid keeps the semantic head
 
-The question path keeps the vector top 8. When the question starts with "where is", the chunk whose symbol equals the last name moves to position 1. The last name in "Where is the object schema function defined?" is `object`, because `schema`, `function`, and `defined` are role words. When no chunk has that symbol, the vector order stays. The chunk set does not change.
+The question path runs semantic search and keyword search, each for the top 50. The model receives the semantic top 8. When the question starts with "where is", the chunk whose symbol equals the last name moves to position 1. The last name in "Where is the object schema function defined?" is `object`, because `schema`, `function`, and `defined` are role words.
+
+The best keyword chunk takes the last slot when it is also in the semantic top 50 and it is outside the top 8. A keyword chunk that semantic search did not return stays out. The first seven semantic chunks stay.
 
 `fuseRanks` still computes `score(chunk) = Σ 1 / (60 + rank)`. Rank starts at 1. `RRF_K` is 60. `RETRIEVAL_TOP_K` is 50. The question path does not use that score to choose the 8.
 
@@ -202,11 +207,11 @@ The production path stays dense.
 
 ### Stage 4: Turn on hybrid search
 
-**Status.** A normal question uses the vector top 8. A question that starts with "where is" moves the chunk whose symbol equals the last name to position 1. The eval token can still request `retrieval=dense` or `retrieval=bm25`. Do not merge unless identifier hit@1 is above 0.5.
+**Status.** A normal question runs semantic search and keyword search for the top 50. The model receives the semantic top 8. A "where is" question moves the named symbol to position 1. The best keyword chunk takes the last slot only when semantic search also returned it outside that 8. The eval token can still request `retrieval=dense` or `retrieval=bm25`. Do not merge unless identifier hit@1 is above 0.5.
 
-- Give the model the vector top 8.
-- Move the named symbol to position 1 when the question starts with "where is".
-- Leave the chunk set unchanged.
+- Call `semanticSearch` and `keywordSearch` with a limit of 50.
+- Keep the semantic top 8, with the named symbol first on a "where is" question.
+- Put the best keyword chunk in the last slot only when it is also in the semantic top 50 and outside the top 8.
 - This is the production path.
 - **Staging check:** the required eval check is green. The printed identifier hit@1 is higher than the dense number from stage 1. When hit@1 is not higher, do not merge.
 

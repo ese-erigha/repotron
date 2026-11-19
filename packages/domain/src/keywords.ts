@@ -1,4 +1,4 @@
-import { RRF_K } from './limits.ts'
+import { CONTEXT_CHUNKS, RRF_K } from './limits.ts'
 
 const CAMEL_PART = /[A-Z]?[a-z]+|[A-Z]+(?![a-z])|\d+/g
 
@@ -82,6 +82,19 @@ export function promoteSymbolHit<T extends { symbol: string | null }>(chunks: T[
   const next = [...chunks]
   const [hit] = next.splice(match, 1)
   return hit ? [hit, ...next] : chunks
+}
+
+export function blendSearches<T extends { id: string; symbol: string | null }>(
+  semantic: T[],
+  keyword: T[],
+  question: string,
+): T[] {
+  const head = promoteSymbolHit(semantic.slice(0, CONTEXT_CHUNKS), question)
+  const keywordHit = keyword[0]
+  if (!keywordHit) return head
+  if (!semantic.some((chunk) => chunk.id === keywordHit.id)) return head
+  if (head.some((chunk) => chunk.id === keywordHit.id)) return head
+  return [...head.slice(0, CONTEXT_CHUNKS - 1), keywordHit]
 }
 
 export function fuseRanks(denseIds: string[], keywordIds: string[]): string[] {
