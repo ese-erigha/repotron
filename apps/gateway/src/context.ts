@@ -18,7 +18,13 @@ export type RepositoryIndexingClient = {
 export type VectorIndex = {
   query(
     vector: number[],
-    options: { topK: number; namespace: string; returnValues: false; returnMetadata: 'none' },
+    options: {
+      topK: number
+      namespace: string
+      returnValues: false
+      returnMetadata: 'none'
+      filter?: Record<string, string | { $gte: string; $lt: string }>
+    },
   ): Promise<{ matches?: { id: string }[] }>
 }
 

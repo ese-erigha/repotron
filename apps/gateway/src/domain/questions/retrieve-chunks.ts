@@ -3,7 +3,11 @@ import {
   EMBEDDING_MODEL_ID,
   formatQueryInput,
   keywordMatch,
+  matchesScope,
+  metadataFilter,
   promoteSymbolHit,
+  RETRIEVAL_TOP_K,
+  type SearchScope,
 } from 'repotron-domain'
 import type { SourceChunkRecord } from 'db'
 
@@ -13,25 +17,38 @@ export type SearchInput = {
   indexId: string
   question: string
   limit: number
+  scope?: SearchScope
 }
 
 export async function semanticSearch(input: SearchInput): Promise<SourceChunkRecord[]> {
-  const ids = await vectorIds(input.indexId, input.question, input.limit)
-  return rowsInOrder(input.indexId, ids)
+  const topK = input.scope ? RETRIEVAL_TOP_K : input.limit
+  const ids = await vectorIds(input.indexId, input.question, topK, metadataFilter(input.scope))
+  const rows = await rowsInOrder(input.indexId, ids)
+  return rowsInScope(rows, input.scope).slice(0, input.limit)
 }
 
 export async function keywordSearch(input: SearchInput): Promise<SourceChunkRecord[]> {
   const ids = await keywordIds(input)
-  return rowsInOrder(input.indexId, ids)
+  const rows = await rowsInOrder(input.indexId, ids)
+  return rowsInScope(rows, input.scope).slice(0, input.limit)
 }
 
-export async function retrieveAnswerChunks(indexId: string, question: string): Promise<SourceChunkRecord[]> {
-  const search: SearchInput = { indexId, question, limit: CONTEXT_CHUNKS }
+export async function retrieveAnswerChunks(
+  indexId: string,
+  question: string,
+  scope?: SearchScope,
+): Promise<SourceChunkRecord[]> {
+  const search: SearchInput = { indexId, question, limit: CONTEXT_CHUNKS, scope }
   const chunks = await semanticSearch(search)
   return promoteSymbolHit(chunks, question)
 }
 
-async function vectorIds(indexId: string, question: string, topK: number): Promise<string[]> {
+async function vectorIds(
+  indexId: string,
+  question: string,
+  topK: number,
+  filter: ReturnType<typeof metadataFilter>,
+): Promise<string[]> {
   const embedded = await getAi().run(
     EMBEDDING_MODEL_ID,
     { input: [formatQueryInput(question)] },
@@ -44,6 +61,7 @@ async function vectorIds(indexId: string, question: string, topK: number): Promi
     namespace: indexId,
     returnValues: false,
     returnMetadata: 'none',
+    ...(filter ? { filter } : {}),
   })
   return (result.matches ?? []).map((match) => match.id)
 }
@@ -56,6 +74,10 @@ async function keywordIds(input: SearchInput): Promise<string[]> {
     match,
     limit: input.limit,
   })
+}
+
+function rowsInScope(rows: SourceChunkRecord[], scope: SearchScope | undefined): SourceChunkRecord[] {
+  return rows.filter((row) => matchesScope(row.path, row.language, scope))
 }
 
 async function rowsInOrder(indexId: string, ids: string[]): Promise<SourceChunkRecord[]> {

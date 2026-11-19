@@ -32,6 +32,7 @@ export {
   LINE_OVERLAP,
   LINE_WINDOW,
   MAX_CHUNK_TOKENS,
+  PATH_PREFIX_MAX_CHARS,
   QUESTION_MAX_CHARS,
   QUESTIONS_PER_HOUR,
   RATE_LIMIT_WINDOW_MS,
@@ -39,6 +40,7 @@ export {
   REPOSITORY_MAX_FILES,
   REPOSITORY_MAX_KILOBYTES,
   START_HERE_MAX_PATHS,
+  VECTOR_METADATA_BYTES,
   STATUS_POLL_MS,
 } from './limits.ts'
 export { ANSWER_MODEL_ID, EMBEDDING_MODEL_ID } from './models.ts'
@@ -55,6 +57,8 @@ export type { GithubLineLink, RepositoryLink } from './links.ts'
 export { formatChunkInput, formatQueryInput } from './formats.ts'
 export { RETRIEVAL_MODE, fuseRanks, keywordMatch, promoteSymbolHit } from './keywords.ts'
 export { readCitedNumbers } from './citations.ts'
+export { matchesScope, metadataFilter } from './scope.ts'
+export type { MetadataFilter, SearchScope } from './scope.ts'
 export {
   chunkKindSchema,
   chunkSchema,

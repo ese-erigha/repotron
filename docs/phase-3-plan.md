@@ -230,6 +230,8 @@ The production path stays dense.
 
 ### Stage 7: Add scope filters
 
+**Status.** The ask form can send a language and a path prefix. Golden questions send neither. A path prefix of 64 bytes or less is a Vectorize range filter. A longer prefix is applied to the loaded rows. Keyword rows are filtered the same way.
+
 - Add the language field and the path prefix field to the ask form and to the question schema.
 - Apply Decision G.
 - Golden questions stay unscoped.

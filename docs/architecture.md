@@ -310,7 +310,7 @@ Python 3.12, managed with uv. CI runs it against the staging gateway. Phase 2 de
 1. The gateway applies the hourly question limit and loads the index. It rejects an index that is not `ready`.
 2. Phase 1: embed the question, then query Vectorize with `topK` 8 in the namespace of the index.
 3. Phase 3: run the hybrid path instead.
-   1. Embed the question. Query Vectorize with `topK` 8.
+   1. Embed the question. Query Vectorize with `topK` 8. An optional language or path prefix filters that query. A path prefix longer than 64 bytes is applied to the loaded rows.
    2. When the question starts with "where is", move the chunk whose symbol equals the last name to position 1. A keyword chunk does not replace a semantic chunk.
    3. A later stage sends candidates to the reranker and keeps the top 8.
    4. Give each kept chunk a confidence label from its reranker score. Refer to the confidence rules below.

@@ -5,6 +5,7 @@ import { describe, it } from 'node:test'
 import { buildContract } from './contract.ts'
 import { formatChunkInput, formatQueryInput } from './formats.ts'
 import { fuseRanks, keywordMatch, promoteSymbolHit } from './keywords.ts'
+import { matchesScope, metadataFilter } from './scope.ts'
 import { buildGithubLineUrl, parseRepositoryLink } from './links.ts'
 import { readCitedNumbers } from './citations.ts'
 
@@ -90,6 +91,28 @@ describe('promoteSymbolHit', () => {
     const ordered = promoteSymbolHit(chunks, 'Where is the route decorator defined?')
 
     assert.deepEqual(ordered.map((chunk) => chunk.id), ['method', 'class'])
+  })
+})
+
+describe('metadataFilter', () => {
+  it('when the path prefix fits in the metadata limit, then the filter is a string range', () => {
+    const filter = metadataFilter({ pathPrefix: 'src/flask/' })
+
+    assert.deepEqual(filter, { path: { $gte: 'src/flask/', $lt: 'src/flask0' } })
+  })
+
+  it('when the path prefix is longer than the metadata limit, then the filter omits the path', () => {
+    const filter = metadataFilter({ pathPrefix: 'p'.repeat(65), language: 'python' })
+
+    assert.deepEqual(filter, { language: 'python' })
+  })
+})
+
+describe('matchesScope', () => {
+  it('when the chunk path is outside the prefix, then the chunk does not match', () => {
+    const matches = matchesScope('packages/zod/src/file.ts', 'typescript', { pathPrefix: 'src/flask/' })
+
+    assert.equal(matches, false)
   })
 })
 
