@@ -3,7 +3,7 @@ import {
   EMBEDDING_MODEL_ID,
   formatQueryInput,
   keywordMatch,
-  promoteKeywordHit,
+  promoteSymbolHit,
   RETRIEVAL_TOP_K,
 } from 'repotron-domain'
 import type { SourceChunkRecord } from 'db'
@@ -21,11 +21,8 @@ export async function retrieveKeywordChunks(indexId: string, question: string): 
 }
 
 export async function retrieveHybridChunks(indexId: string, question: string): Promise<SourceChunkRecord[]> {
-  const [dense, keywords] = await Promise.all([
-    vectorIds(indexId, question, RETRIEVAL_TOP_K),
-    keywordIds(indexId, question),
-  ])
-  return rowsInOrder(indexId, promoteKeywordHit(dense, keywords))
+  const chunks = await retrieveChunks(indexId, question)
+  return promoteSymbolHit(chunks, question)
 }
 
 async function vectorIds(indexId: string, question: string, topK: number): Promise<string[]> {

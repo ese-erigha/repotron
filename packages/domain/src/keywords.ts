@@ -1,6 +1,17 @@
-import { CONTEXT_CHUNKS, RRF_K } from './limits.ts'
+import { RRF_K } from './limits.ts'
 
 const CAMEL_PART = /[A-Z]?[a-z]+|[A-Z]+(?![a-z])|\d+/g
+
+const ROLE_WORDS = new Set<string>([
+  'function',
+  'method',
+  'class',
+  'defined',
+  'declared',
+  'schema',
+  'type',
+  'decorator',
+])
 
 const CLOSED_CLASS_WORDS = new Set<string>([
   'a',
@@ -62,12 +73,15 @@ export function keywordMatch(question: string): string {
   return terms.join(' OR ')
 }
 
-export function promoteKeywordHit(vectorIds: string[], keywordIds: string[]): string[] {
-  const head = vectorIds.slice(0, CONTEXT_CHUNKS)
-  const keywordHit = keywordIds[0]
-  if (!keywordHit || !vectorIds.includes(keywordHit)) return head
-  const rest = head.filter((id) => id !== keywordHit)
-  return [keywordHit, ...rest].slice(0, CONTEXT_CHUNKS)
+export function promoteSymbolHit<T extends { symbol: string | null }>(chunks: T[], question: string): T[] {
+  if (!question.toLowerCase().startsWith('where is ')) return chunks
+  const name = questionNames(question).at(-1)?.toLowerCase()
+  if (!name) return chunks
+  const match = chunks.findIndex((chunk) => chunk.symbol?.toLowerCase() === name)
+  if (match <= 0) return chunks
+  const next = [...chunks]
+  const [hit] = next.splice(match, 1)
+  return hit ? [hit, ...next] : chunks
 }
 
 export function fuseRanks(denseIds: string[], keywordIds: string[]): string[] {
@@ -85,6 +99,16 @@ function addRanks(scores: Map<string, number>, ids: string[]): void {
     const score = 1 / (RRF_K + rank)
     scores.set(id, (scores.get(id) ?? 0) + score)
   })
+}
+
+function questionNames(question: string): string[] {
+  const names: string[] = []
+  for (const word of question.match(/[A-Za-z0-9_-]+/g) ?? []) {
+    const lower = word.toLowerCase()
+    if (CLOSED_CLASS_WORDS.has(lower) || ROLE_WORDS.has(lower)) continue
+    names.push(word)
+  }
+  return names
 }
 
 function keywordTerms(word: string): string[] {

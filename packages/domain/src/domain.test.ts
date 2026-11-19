@@ -4,7 +4,7 @@ import { describe, it } from 'node:test'
 
 import { buildContract } from './contract.ts'
 import { formatChunkInput, formatQueryInput } from './formats.ts'
-import { fuseRanks, keywordMatch, promoteKeywordHit } from './keywords.ts'
+import { fuseRanks, keywordMatch, promoteSymbolHit } from './keywords.ts'
 import { buildGithubLineUrl, parseRepositoryLink } from './links.ts'
 import { readCitedNumbers } from './citations.ts'
 
@@ -51,24 +51,45 @@ describe('keywordMatch', () => {
   })
 })
 
-describe('promoteKeywordHit', () => {
-  it('when the first keyword chunk is outside the vector list, then the result keeps the vector order', () => {
-    const ids = promoteKeywordHit(['v1', 'v2', 'v3'], ['k1'])
+describe('promoteSymbolHit', () => {
+  it('when the question does not ask where a name is, then the chunk order stays', () => {
+    const chunks = [
+      { symbol: 'object', id: 'a' },
+      { symbol: 'string', id: 'b' },
+    ]
+    const ordered = promoteSymbolHit(chunks, 'How does Zod build an object schema from a shape?')
 
-    assert.deepEqual(ids, ['v1', 'v2', 'v3'])
+    assert.deepEqual(ordered.map((chunk) => chunk.id), ['a', 'b'])
   })
 
-  it('when the first keyword chunk is below the vector head, then it moves to the front', () => {
-    const vector = ['v1', 'v2', 'v3', 'v4', 'v5', 'v6', 'v7', 'v8', 'v9']
-    const ids = promoteKeywordHit(vector, ['v9'])
+  it('when a later chunk symbol is the last name, then that chunk moves to the front', () => {
+    const chunks = [
+      { symbol: 'shape', id: 'a' },
+      { symbol: 'object', id: 'b' },
+    ]
+    const ordered = promoteSymbolHit(chunks, 'Where is the object schema function defined?')
 
-    assert.deepEqual(ids, ['v9', 'v1', 'v2', 'v3', 'v4', 'v5', 'v6', 'v7'])
+    assert.deepEqual(ordered.map((chunk) => chunk.id), ['b', 'a'])
   })
 
-  it('when the first keyword chunk is already in the vector head, then the result has no duplicate', () => {
-    const ids = promoteKeywordHit(['v1', 'v2', 'v3'], ['v3'])
+  it('when the question names a constructor, then the constructor chunk moves ahead of the class', () => {
+    const chunks = [
+      { symbol: 'Hono', id: 'class' },
+      { symbol: 'constructor', id: 'ctor' },
+    ]
+    const ordered = promoteSymbolHit(chunks, 'Where is the Hono constructor defined?')
 
-    assert.deepEqual(ids, ['v3', 'v1', 'v2'])
+    assert.deepEqual(ordered.map((chunk) => chunk.id), ['ctor', 'class'])
+  })
+
+  it('when the question names a decorator, then the route chunk moves to the front', () => {
+    const chunks = [
+      { symbol: 'Flask', id: 'class' },
+      { symbol: 'route', id: 'method' },
+    ]
+    const ordered = promoteSymbolHit(chunks, 'Where is the route decorator defined?')
+
+    assert.deepEqual(ordered.map((chunk) => chunk.id), ['method', 'class'])
   })
 })
 

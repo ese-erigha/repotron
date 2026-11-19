@@ -310,11 +310,10 @@ Python 3.12, managed with uv. CI runs it against the staging gateway. Phase 2 de
 1. The gateway applies the hourly question limit and loads the index. It rejects an index that is not `ready`.
 2. Phase 1: embed the question, then query Vectorize with `topK` 8 in the namespace of the index.
 3. Phase 3: run the hybrid path instead.
-   1. Embed the question. Query Vectorize with `topK` 50 and the scope filters.
-   2. Query `chunk_keywords` with BM25 for the top 50. Quote each term of the question and join the terms with `OR`.
-   3. Keep the vector top 8. When the keyword rank-1 chunk is inside the vector top 50, move that chunk to position 1.
-   4. A later stage sends candidates to the reranker and keeps the top 8.
-   5. Give each kept chunk a confidence label from its reranker score. Refer to the confidence rules below.
+   1. Embed the question. Query Vectorize with `topK` 8.
+   2. When the question starts with "where is", move the chunk whose symbol equals the last name to position 1. A role word such as "function" or "decorator" is not a name.
+   3. A later stage sends candidates to the reranker and keeps the top 8.
+   4. Give each kept chunk a confidence label from its reranker score. Refer to the confidence rules below.
 4. Load the chunk rows from D1 and send the `retrieval` event.
 5. Build the prompt from the answer contract in the PRD.
    - For "Where do I start?", also load the distinct paths of the index from `source_chunks`, up to `START_HERE_MAX_PATHS`.
