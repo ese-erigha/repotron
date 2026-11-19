@@ -4,24 +4,30 @@ import {
   formatQueryInput,
   keywordMatch,
   promoteSymbolHit,
-  RETRIEVAL_TOP_K,
 } from 'repotron-domain'
 import type { SourceChunkRecord } from 'db'
 
 import { getAi, getConfig, getRepositories, getVectors } from '../../context.ts'
 
-export async function retrieveChunks(indexId: string, question: string): Promise<SourceChunkRecord[]> {
-  const ids = await vectorIds(indexId, question, CONTEXT_CHUNKS)
-  return rowsInOrder(indexId, ids)
+export type SearchInput = {
+  indexId: string
+  question: string
+  limit: number
 }
 
-export async function retrieveKeywordChunks(indexId: string, question: string): Promise<SourceChunkRecord[]> {
-  const ids = await keywordIds(indexId, question)
-  return rowsInOrder(indexId, ids)
+export async function semanticSearch(input: SearchInput): Promise<SourceChunkRecord[]> {
+  const ids = await vectorIds(input.indexId, input.question, input.limit)
+  return rowsInOrder(input.indexId, ids)
 }
 
-export async function retrieveHybridChunks(indexId: string, question: string): Promise<SourceChunkRecord[]> {
-  const chunks = await retrieveChunks(indexId, question)
+export async function keywordSearch(input: SearchInput): Promise<SourceChunkRecord[]> {
+  const ids = await keywordIds(input)
+  return rowsInOrder(input.indexId, ids)
+}
+
+export async function retrieveAnswerChunks(indexId: string, question: string): Promise<SourceChunkRecord[]> {
+  const search: SearchInput = { indexId, question, limit: CONTEXT_CHUNKS }
+  const chunks = await semanticSearch(search)
   return promoteSymbolHit(chunks, question)
 }
 
@@ -42,13 +48,13 @@ async function vectorIds(indexId: string, question: string, topK: number): Promi
   return (result.matches ?? []).map((match) => match.id)
 }
 
-async function keywordIds(indexId: string, question: string): Promise<string[]> {
-  const match = keywordMatch(question)
+async function keywordIds(input: SearchInput): Promise<string[]> {
+  const match = keywordMatch(input.question)
   if (match === '') return []
   return getRepositories().sourceChunks.listIdsByKeyword({
-    indexId,
+    indexId: input.indexId,
     match,
-    limit: RETRIEVAL_TOP_K,
+    limit: input.limit,
   })
 }
 

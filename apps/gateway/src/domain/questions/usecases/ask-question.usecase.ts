@@ -1,11 +1,13 @@
 import type { SourceChunkRecord } from 'db'
 import {
+  CONTEXT_CHUNKS,
   ERROR_CODE,
   explainFeatureQuestion,
   INDEX_STATUS,
   PRESET,
   PRESET_QUESTION,
   RETRIEVAL_MODE,
+  RETRIEVAL_TOP_K,
   START_HERE_MAX_PATHS,
 } from 'repotron-domain'
 
@@ -14,7 +16,7 @@ import type { QuestionBody } from '../questions.schema.ts'
 import { getConfig, getRepositories } from '../../../context.ts'
 import { RequestError } from '../../../http-error.ts'
 import { consumeLimit, RATE_LIMIT_KIND } from '../../indexes/consume-limit.ts'
-import { retrieveChunks, retrieveHybridChunks, retrieveKeywordChunks } from '../retrieve-chunks.ts'
+import { keywordSearch, retrieveAnswerChunks, semanticSearch, type SearchInput } from '../retrieve-chunks.ts'
 import { openAnswerStream } from '../stream-answer.ts'
 
 export type AskQuestionInput = {
@@ -67,10 +69,16 @@ async function retrieveQuestionChunks(
   indexId: string,
   question: string,
 ): Promise<SourceChunkRecord[]> {
-  if (!isEvalToken(input.evalToken)) return retrieveHybridChunks(indexId, question)
-  if (input.retrieval === RETRIEVAL_MODE.dense) return retrieveChunks(indexId, question)
-  if (input.retrieval === RETRIEVAL_MODE.bm25) return retrieveKeywordChunks(indexId, question)
-  return retrieveHybridChunks(indexId, question)
+  if (!isEvalToken(input.evalToken)) return retrieveAnswerChunks(indexId, question)
+  if (input.retrieval === RETRIEVAL_MODE.dense) {
+    const search: SearchInput = { indexId, question, limit: CONTEXT_CHUNKS }
+    return semanticSearch(search)
+  }
+  if (input.retrieval === RETRIEVAL_MODE.bm25) {
+    const search: SearchInput = { indexId, question, limit: RETRIEVAL_TOP_K }
+    return keywordSearch(search)
+  }
+  return retrieveAnswerChunks(indexId, question)
 }
 
 function questionText(body: QuestionBody): string {
