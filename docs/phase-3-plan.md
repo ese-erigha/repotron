@@ -89,7 +89,7 @@ The index id still comes from the route. It never comes from the question text.
 - Vectorize keeps the namespace equal to the index id. The candidate query asks for 50 matches.
 - `chunk_keywords` holds `chunk_id` and `index_id` as UNINDEXED columns, plus `content` and `identifiers`. The index id contains hyphens. The tokenizer would split those hyphens, so the id is not part of the MATCH text. The WHERE clause filters `index_id`.
 - The tokenizer is `unicode61` with `tokenchars '_'`, so a snake_case name stays one token.
-- The MATCH text quotes each question term and joins the terms with `OR`. The same splitter that writes identifiers splits the question, so `getUserById` also searches `get`, `user`, and `id`.
+- The MATCH text quotes each question term and joins the terms with `OR`. A closed-class word, such as `where` or `the`, is not a term. The same splitter that writes identifiers splits the question, so `getUserById` also searches `get`, `user`, and `id`.
 
 ### Decision C: The table follows the chunk rows
 

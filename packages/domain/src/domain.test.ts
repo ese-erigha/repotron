@@ -39,6 +39,16 @@ describe('keywordMatch', () => {
     assert.equal(match.includes('"id"'), true)
     assert.equal(match.includes('9-abc'), false)
   })
+
+  it('when the question uses closed-class words, then the match text keeps the content words', () => {
+    const match = keywordMatch('Where is the object schema function defined?')
+
+    assert.equal(match.includes('"object"'), true)
+    assert.equal(match.includes('"schema"'), true)
+    assert.equal(match.includes('"function"'), true)
+    assert.equal(match.includes('"defined"'), true)
+    assert.equal(match.includes('"the"'), false)
+  })
 })
 
 describe('fuseRanks', () => {

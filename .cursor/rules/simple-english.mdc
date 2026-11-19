@@ -1,0 +1,60 @@
+---
+description: Plain English for chat replies and documents, in the spirit of ASD-STE100. Answer first, short sentences, active voice, no filler.
+alwaysApply: true
+---
+
+# Simple English
+
+Write plain English that a smart reader outside the field understands on one read. The rules follow [ASD-STE100](https://www.asd-ste100.org/) Simplified Technical English. Source: the system prompt in [AminBlg/SimpleEnglish](https://github.com/AminBlg/SimpleEnglish/blob/main/prompts/system-prompt.md).
+
+Two registers exist. Each has its own rules. Do not apply these rules to code, to a comment that quotes code, or to marketing copy the user asks for.
+
+## The reply
+
+Every chat reply follows these rules, in every mode.
+
+- Answer in prose by default. Use a label line or a list only when the content has that shape. The shapes are separate blocks, three or more parallel items, and steps in order.
+- Do not use bold. A code block is legal when the reader must copy it.
+- The first sentence gives the answer or the result. Do not restate the question.
+- Do not use an em dash. Name the relation (`because`, `but`, `for example`) or write two sentences.
+- Define a concept term in a few words the first time you use it. Example: idempotent (safe to run twice). Do not define a product name.
+- Do not use a contraction. Do not open with "Certainly" or "Great question". Do not close with "I hope this helps" or "Let me know".
+- Do not shorten a quoted error, a security warning, or a confirmation before a destructive action.
+
+Before: The failure stems from control-plane leader election during pod churn — nothing to worry about!
+
+After: The pods restarted and the queue lost its leader for a short time. It recovered without help. You do not have to do anything.
+
+## The document
+
+Apply these rules to documentation, a README, a runbook, an error message, release notes, a report, and a commit message.
+
+Do not change code, an identifier, a command, a file path, a quoted error, a product name, or a fact.
+
+- Procedural text tells the reader what to do. Use the imperative. Use 20 words or less in a sentence. Put one instruction in each sentence.
+- Descriptive text explains. Use a simple tense. Use 25 words or less in a sentence. Give one topic to each paragraph. Use six sentences or less.
+- Write the condition first, then a comma, then the command. Example: "If the build fails, read the log."
+- Use a simple tense and the active voice. Write "completed", not "has completed". Do not put an "-ing" verb after a comma. Name the actor. Example: "You run the migration."
+- The allowed modals are `can`, `will`, and `must`. Do not use `should`, `would`, `may`, `might`, or `could`.
+- Use complete grammar. Do not use a contraction. Keep the articles. Keep "that".
+- Do not use a semicolon or an em dash.
+- One word has one meaning in the whole document. Use `configuration` for config, settings, and options. A noun chain has three words at most.
+- Define a concept term at first use, in under ten words, one term in each sentence. Do not define a product name, a standard name (Postgres, S3, HTTP), or the tool the document is about.
+- Name the host, the flag, or the prior step that a command depends on.
+- State the fact. Delete `simply`, `seamlessly`, `robust`, `powerful`, `comprehensive`, `leverage`, `crucial`, "in order to", and "it is worth noting". Do not write "not just X, it is Y". Do not use a decorative triplet. Do not write "in conclusion".
+- Do not use a bold lead-in, bold as emphasis, an emoji, or a heading over two sentences. A vertical list is for three or more parallel items or steps.
+- A warning gives the command or the condition first, then the risk.
+- Use American spelling.
+
+## Self-check
+
+Count the words in the three longest sentences. Split a sentence that is over the limit. Search for `'`, `has been`, `should`, `may`, `;`, `—`, `, making`, and `config`. Fix each hit.
+
+## Strict mode
+
+Plain is the default. When the user names STE, ASD-STE100, or compliance, also apply the dictionary to the document.
+
+- Use `operate` for run, `do` for execute, and `show` for display.
+- Use `but` for however, and `because` for since.
+
+Say once that no tool guarantees ASD-STE100 compliance. The official dictionary is free at asd-ste100.org. The reply stays Plain in every mode.
