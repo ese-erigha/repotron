@@ -1,5 +1,6 @@
 import {
   doneEventSchema,
+  type Language,
   errorEventSchema,
   PRESET,
   retrievalEventSchema,
@@ -15,7 +16,7 @@ import { getHttpClient } from './client'
 import { INDEX_PATH } from './endpoints'
 
 export type QuestionBody =
-  | { question: string }
+  | { question: string; language?: Language; pathPrefix?: string }
   | { preset: typeof PRESET.startHere }
   | { preset: typeof PRESET.explainFeature; featureName: string }
 

@@ -1,6 +1,10 @@
 export const ASK_TEXT = {
   QUESTION_LABEL: 'Ask a question about this repository',
   PLACEHOLDER: 'Ask about a function, a file, or a flow',
+  SCOPE_LANGUAGE: 'Language',
+  SCOPE_ANY_LANGUAGE: 'Any language',
+  SCOPE_PATH: 'Path prefix',
+  SCOPE_PATH_PLACEHOLDER: 'src/flask/',
   SUBMIT: 'Ask',
   SUBMIT_HINT: 'Enter to ask',
   PRESET_START_HERE: 'Where do I start?',
