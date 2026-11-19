@@ -274,7 +274,7 @@ AI Gateway fronts each model call. It records the model id, the tokens, and the 
   - The model expects task prefixes. A question becomes `task: search result | query: <question>`. A chunk uses the `title` and `text` form in the chunk rules.
   - One request allows 8,192 tokens. That limit is the sum of every text in the request. `EMBED_BATCH_SIZE` is 1, so one chunk at the 1,500-token cap stays under that limit. `EMBED_CONCURRENCY` is 10, so ten calls run at the same time.
   - The code models are `voyage-code-4` and `voyage-code-3` on the Voyage API, and `mongodb/voyage-code-4` on OpenRouter. `voyage-code-3` is not an OpenRouter id. The default is `mongodb/voyage-code-4`.
-- **Reranker.** Phase 3 starts with Workers AI `bge-reranker-base`. The ablation compares it with Cohere Rerank through AI Gateway.
+- **Reranker.** The measured model is Workers AI `@cf/baai/bge-reranker-base`. That is the only reranker Workers AI hosts. `bge-reranker-v2-m3` is not on Workers AI and is not an OpenRouter id. The next candidate after a failed score check is OpenRouter `mongodb/rerank-3`. The full list is in [retrieval-improvement-plan.md](retrieval-improvement-plan.md).
 - **Answer model.** OpenRouter model `anthropic/claude-haiku-5.5`, through the AI Gateway OpenRouter route. Stream the tokens. Temperature 0. The Worker var is `ANSWER_MODEL_ID`. The gateway calls it with `fetch`, with no SDK.
   - Set `reasoning.effort` to `none`. Thinking is on by default. Thinking tokens delay the first answer token and add to the output bill.
   - OpenRouter lists this model at $0.10 per million input tokens and $0.50 per million output tokens, as of November 2026.

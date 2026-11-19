@@ -34,7 +34,16 @@ OpenRouter embedding route. The MongoDB ids are the Voyage 4 models under the `m
 
 `voyage-code-3` is not an OpenRouter model id. OpenRouter also hosts `mistralai/codestral-embed-2505`, which is a code embedding model and is not a Voyage model. It is not the default.
 
-The reranker model stays `@cf/baai/bge-reranker-base` until step 2 fails the definition-versus-readme check.
+The measured reranker is `@cf/baai/bge-reranker-base`. Workers AI hosts that one reranker and does not host `bge-reranker-v2-m3`. `bge-reranker-base` is an older English cross-encoder. `bge-reranker-v2-m3` is a newer multilingual BAAI model. It is not on Workers AI, and it is not in the OpenRouter list read on 19 November 2026. Step 2 still scores `bge-reranker-base` with a new question text, because that call needs no new vendor. When that check fails, step 4 uses `mongodb/rerank-3` on OpenRouter.
+
+OpenRouter rerankers:
+
+- `mongodb/rerank-3`. Voyage reranker. This is the default after `bge-reranker-base` fails.
+- `mongodb/rerank-3-lite`. Smaller Voyage reranker.
+- `mongodb/rerank-2.5` and `mongodb/rerank-2.5-lite`. Older Voyage rerankers.
+- `cohere/rerank-5-pro` and `cohere/rerank-5-fast`. Current Cohere rerankers.
+- `cohere/rerank-4-pro`, `cohere/rerank-4-fast`, and `cohere/rerank-v3.5`. Older Cohere rerankers.
+- `qwen/qwen3-reranker-8b` and `qwen/qwen3-reranker-0.6b`. Qwen rerankers.
 
 ## Re-index
 
@@ -49,9 +58,9 @@ The re-index uses the pinned commits in `apps/evals/golden/*.yaml`. It does not 
 One step is one pull request. Stop when the check fails. Do not hide a failure by starting the next step.
 
 1. Add the keyword chunk without a deletion. Keep the semantic top 8 and the symbol move. Call `keywordSearch` with a limit of 50. When the best keyword chunk is not already in the 8, append it. The model receives 9 chunks. Merge only when recall stays at 0.7407 and `identifierHitAt1` stays at 1.0. When recall drops, stop. Do not swap a keyword chunk into the 8. Equal reciprocal rank fusion already failed that test.
-2. Change the reranker text. Do not sort the live list. Score the same 20 ground-truth pairs with `@cf/baai/bge-reranker-base`. Send the symbol name, with the chunk title in the passage. Record the low score, the high score, and the sigmoid decision in `apps/evals/reranker-scores.md`. The check passes when the lowest definition score is above 0.9927901029586792, the titled-passage score for "What is Flask?". When a definition still scores lower, try one more text, `Where is {symbol} defined?`. When that also fails, leave this model unsorted and go to step 4 for a different reranker. Do not sort with a model that ranks a readme above a definition.
+2. Change the reranker text. Do not sort the live list. Score the same 20 ground-truth pairs with `@cf/baai/bge-reranker-base`. Send the symbol name, with the chunk title in the passage. Record the low score, the high score, and the sigmoid decision in `apps/evals/reranker-scores.md`. The check passes when the lowest definition score is above 0.9927901029586792, the titled-passage score for "What is Flask?". When a definition still scores lower, try one more text, `Where is {symbol} defined?`. When that also fails, leave `bge-reranker-base` unsorted. Step 4 then scores `mongodb/rerank-3`. Do not sort with a model that ranks a readme above a definition.
 3. Re-index the three pinned commits with `mongodb/voyage-code-4` at 1024 dimensions. Create a new Vectorize index and point the gateway and the pipeline at it. Delete `repotron-staging-chunks` after the new index is `ready` and the 30 questions have run. The embedding text stays `title: path symbol | text: content`, and it adds the first docstring or the signature when the chunk has one. The raw code stays in `chunk_keywords`. The symbol move stays. Record the new recall and the new `identifierHitAt1` as the floor for later steps.
-4. Choose the reranker on the index that step 3 kept. If step 2 passed, use `bge-reranker-base`. If step 2 failed, score the same 20 pairs with one other cross-encoder and apply the same definition-versus-readme check. Sort the chunks only after that check passes. On a "where is" question, the symbol-matched chunk stays first. Merge only when recall stays at the new floor from step 3, `identifierHitAt1` stays at 1.0, and retrieval p95 stays under 800 ms.
+4. Choose the reranker on the index that step 3 kept. If step 2 passed, use `@cf/baai/bge-reranker-base`. If step 2 failed, score the same 20 pairs with `mongodb/rerank-3` and apply the same definition-versus-readme check. Sort the chunks only after that check passes. On a "where is" question, the symbol-matched chunk stays first. Merge only when recall stays at the new floor from step 3, `identifierHitAt1` stays at 1.0, and retrieval p95 stays under 800 ms.
 5. Write the comparison. Score keyword search alone, semantic search alone, semantic search plus the extra keyword chunk, and that list after the reranker. Use the 30 questions. Split the scores by question kind. Commit the file as `apps/evals/ablation.json`. Do not change the production path in this pull request.
 
 ## What this plan refuses
