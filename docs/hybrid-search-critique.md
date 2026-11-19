@@ -21,7 +21,7 @@ The note assumes a naive stack. These parts are already built.
 - The keyword table copies `content` and `identifiers`. The identifier text keeps the full name and the split parts. `getUserById` is stored with `get user by id`.
 - The FTS tokenizer is `unicode61` with `tokenchars '_'`. An underscore stays inside a token. A dot does not. `auth.service.ts` becomes separate tokens.
 - The production path does not fuse lists. It takes the semantic top 8. A question that starts with "where is" moves the chunk whose symbol equals the last name to position 1. On that path, `identifierHitAt1` is 1.0 and recall is 0.7407.
-- The embedding model is `@cf/google/embeddinggemma-2`. A new model is a new vector space and a re-index. Phase 3 keeps this model.
+- The live embedding model is `@cf/google/embeddinggemma-2`, a general text model. The re-index replaces it with `mongodb/voyage-code-4` and deletes `repotron-staging-chunks`. The model list is in [retrieval-improvement-plan.md](retrieval-improvement-plan.md).
 
 ## Where the note does not match the measurements
 
@@ -35,7 +35,7 @@ The note assumes a naive stack. These parts are already built.
 
 ## Where the note is out of this phase
 
-- A code embedding model such as `voyage-code-3` needs a new Vectorize index and a re-index of the pinned commits. The home page indexes the tip of the default branch, not a chosen SHA. That work is out of Phase 3.
+- A code embedding model needs a new Vectorize index and a re-index of the pinned commits. That re-index is step 3 of [retrieval-improvement-plan.md](retrieval-improvement-plan.md). The default model is `mongodb/voyage-code-4`. The home page still indexes the branch tip for a visitor. The golden re-index passes the pinned commit SHA.
 - Embedding a generated summary, and keeping raw code only in BM25, is a second index. It is a re-embed of every chunk. It is not a fusion tweak. A summary that omits the symbol can miss "where is" questions. The symbol column already carries that name.
 - Cohere Rerank and `bge-reranker-v2-m3` are different models. Each one needs its own score range before it sorts a list. The measured model is `bge-reranker-base`.
 
