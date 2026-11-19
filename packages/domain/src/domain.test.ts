@@ -4,7 +4,7 @@ import { describe, it } from 'node:test'
 
 import { buildContract } from './contract.ts'
 import { formatChunkInput, formatQueryInput } from './formats.ts'
-import { blendSearches, fuseRanks, keywordMatch, promoteSymbolHit } from './keywords.ts'
+import { fuseRanks, keywordMatch, promoteSymbolHit } from './keywords.ts'
 import { buildGithubLineUrl, parseRepositoryLink } from './links.ts'
 import { readCitedNumbers } from './citations.ts'
 
@@ -90,48 +90,6 @@ describe('promoteSymbolHit', () => {
     const ordered = promoteSymbolHit(chunks, 'Where is the route decorator defined?')
 
     assert.deepEqual(ordered.map((chunk) => chunk.id), ['method', 'class'])
-  })
-})
-
-describe('blendSearches', () => {
-  it('when the keyword chunk is outside the semantic list, then the result keeps the semantic head', () => {
-    const semantic = [
-      { id: 's1', symbol: 'one' },
-      { id: 's2', symbol: 'two' },
-    ]
-    const blended = blendSearches(semantic, [{ id: 'k1', symbol: 'other' }], 'How does this work?')
-
-    assert.deepEqual(blended.map((chunk) => chunk.id), ['s1', 's2'])
-  })
-
-  it('when the keyword chunk is already in the semantic head, then the result keeps that head', () => {
-    const semantic = [
-      { id: 's1', symbol: 'one' },
-      { id: 's2', symbol: 'two' },
-    ]
-    const blended = blendSearches(semantic, [{ id: 's2', symbol: 'two' }], 'How does this work?')
-
-    assert.deepEqual(blended.map((chunk) => chunk.id), ['s1', 's2'])
-  })
-
-  it('when the keyword chunk is lower in the semantic list, then it takes the last slot', () => {
-    const semantic = [
-      { id: 's1', symbol: 'one' },
-      { id: 's2', symbol: 'two' },
-      { id: 's3', symbol: 'three' },
-      { id: 's4', symbol: 'four' },
-      { id: 's5', symbol: 'five' },
-      { id: 's6', symbol: 'six' },
-      { id: 's7', symbol: 'seven' },
-      { id: 's8', symbol: 'eight' },
-      { id: 's9', symbol: 'nine' },
-    ]
-    const blended = blendSearches(semantic, [{ id: 's9', symbol: 'nine' }], 'How does this work?')
-
-    assert.deepEqual(
-      blended.map((chunk) => chunk.id),
-      ['s1', 's2', 's3', 's4', 's5', 's6', 's7', 's9'],
-    )
   })
 })
 
