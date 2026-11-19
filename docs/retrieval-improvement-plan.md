@@ -16,6 +16,12 @@ Do not remove these. They are the best measured path.
 
 Precision is the weak number. About 1 chunk in 8 overlaps the expected lines. Recall misses about 1 ground-truth range in 4. The symbol move fixed the first chunk for "where is" questions. It did not fix precision.
 
+## Models
+
+The embedding model is `@cf/google/embeddinggemma-2`. The vector size is 768. Step 3 uses this same model. Workers AI does not host `voyage-code-3` or another code-only embedding model. `@cf/qwen/qwen3-embedding-0.6b`, `@cf/baai/bge-m3`, and `@cf/google/embeddinggemma-300m` are general text models, the same class as the model we already run. This plan does not switch to them.
+
+The reranker model is `@cf/baai/bge-reranker-base`. Step 4 names a different cross-encoder only when step 2 fails the definition-versus-readme check.
+
 ## Re-index
 
 Steps 1 and 2 do not re-index. The keyword table is full. The three golden commits already have vectors in `repotron-staging-chunks`.
@@ -30,7 +36,7 @@ One step is one pull request. Stop when the check fails. Do not hide a failure b
 
 1. Add the keyword chunk without a deletion. Keep the semantic top 8 and the symbol move. Call `keywordSearch` with a limit of 50. When the best keyword chunk is not already in the 8, append it. The model receives 9 chunks. Merge only when recall stays at 0.7407 and `identifierHitAt1` stays at 1.0. When recall drops, stop. Do not swap a keyword chunk into the 8. Equal reciprocal rank fusion already failed that test.
 2. Change the reranker text. Do not sort the live list. Score the same 20 ground-truth pairs with `@cf/baai/bge-reranker-base`. Send the symbol name, with the chunk title in the passage. Record the low score, the high score, and the sigmoid decision in `apps/evals/reranker-scores.md`. The check passes when the lowest definition score is above 0.9927901029586792, the titled-passage score for "What is Flask?". When a definition still scores lower, try one more text, `Where is {symbol} defined?`. When that also fails, leave this model unsorted and go to step 4 for a different reranker. Do not sort with a model that ranks a readme above a definition.
-3. Re-index the three pinned commits. Create a new Vectorize index. Do not write into `repotron-staging-chunks`. Pick one embedding model that Workers AI hosts and that was trained for code. If Workers AI has no such model, name the provider and the secret in the pull request before any vector is written. The embedding text stays `title: path symbol | text: content`, and it adds the first docstring or the signature when the chunk has one. The raw code stays in `chunk_keywords` for keyword search. Build the new index to `ready`. Run the 30 questions on semantic search plus the symbol move. Keep the new index only when `identifierHitAt1` is at least 1.0 and recall is above 0.7407. When either check fails, keep the old index and stop the model change.
+3. Re-index the three pinned commits with `@cf/google/embeddinggemma-2`. Create a new Vectorize index with 768 dimensions. Do not write into `repotron-staging-chunks`. The embedding text stays `title: path symbol | text: content`, and it adds the first docstring or the signature when the chunk has one. The raw code stays in `chunk_keywords` for keyword search. Build the new index to `ready`. Run the 30 questions on semantic search plus the symbol move. Keep the new index only when `identifierHitAt1` is at least 1.0 and recall is above 0.7407. When either check fails, keep the old index and stop the model change.
 4. Choose the reranker on the index that step 3 kept. If step 2 passed, use `bge-reranker-base`. If step 2 failed, score the same 20 pairs with one other cross-encoder and apply the same definition-versus-readme check. Sort the chunks only after that check passes. On a "where is" question, the symbol-matched chunk stays first. Merge only when recall stays at the new floor from step 3, `identifierHitAt1` stays at 1.0, and retrieval p95 stays under 800 ms.
 5. Write the comparison. Score keyword search alone, semantic search alone, semantic search plus the extra keyword chunk, and that list after the reranker. Use the 30 questions. Split the scores by question kind. Commit the file as `apps/evals/ablation.json`. Do not change the production path in this pull request.
 
