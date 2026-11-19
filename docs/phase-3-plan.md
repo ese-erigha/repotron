@@ -221,6 +221,8 @@ The production path stays dense.
 
 ### Stage 6: Turn on rerank and the labels
 
+**Status.** Do not start this stage. The plain passage and the titled passage both score definitions near 0 and concept passages near 1. Sorting by that score would put a readme chunk ahead of a function definition. The production path stays the semantic top 8.
+
 - Rerank the top 50 fused chunks. Keep 8.
 - Attach high, medium, or low to each citation in the retrieval event and in the saved citation JSON.
 - Show the label on the citation panel and on the share page.
