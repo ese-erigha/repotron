@@ -10,6 +10,7 @@ export const EMBED_CONCURRENCY = 10
 export const DELETE_PAGE_SIZE = 500
 export const CONTEXT_CHUNKS = 8
 export const RETRIEVAL_TOP_K = 50
+export const RRF_K = 60
 export const START_HERE_MAX_PATHS = 500
 export const QUESTION_MAX_CHARS = 1_000
 export const FEATURE_NAME_MAX_CHARS = 100
