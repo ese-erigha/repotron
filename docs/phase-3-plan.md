@@ -8,7 +8,7 @@ Do not implement the stages in one pull request. A red eval would not say which 
 
 ## Operation
 
-The order is the order in [retrieval-improvement-plan.md](retrieval-improvement-plan.md). Step 1 clears the staging rows and recreates `repotron-staging-chunks` at 1024 dimensions. Step 2 is the code pull request for `mongodb/voyage-code-4`, and that pull request does not run the 30-question eval. Hybrid search waits until the three repositories are indexed at the current head of the default branch.
+The order is the order in [retrieval-improvement-plan.md](retrieval-improvement-plan.md). The current stage is the chunk-text re-index. Hybrid search waits until that measurement is recorded.
 
 **Read first, in this order:**
 
