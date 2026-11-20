@@ -103,7 +103,7 @@ The pipeline Worker sets the status to `embedding` and stores the file count and
 1. Read the JSONL object from R2. The object holds up to 500 chunks.
 2. Take the next 10 chunks.
    - Insert those rows into `source_chunks`. One statement inserts one chunk. The row exists before the vector does.
-   - Embed the chunk text with OpenRouter `mongodb/voyage-code-4`. Each string is `title: <header> | text: <content>`. Each call sends one text. The 10 calls run at the same time.
+   - Embed the chunk text with OpenRouter `mongodb/voyage-code-4`. The string is the header, then the first docstring when the chunk has one, then the content. Each call sends one text. The 10 calls run at the same time.
    - Upsert those vectors into Vectorize. The namespace is the index id.
    - Record the stored chunk count on the index row. The status card shows that count on its next poll.
 3. Repeat until the object is done. The next object starts only after that.
@@ -232,7 +232,7 @@ Python 3.12. One uv project with its own `uv.lock`, because the Docker build con
 - Each chunk holds:
   - `id` (`<indexId>:<seq>`), `path`, `language`, `symbol`, `kind`, `startLine`, and `endLine`
   - `content`: the source lines
-  - `header`: the path and the enclosing symbol. The embedding input is `title: <header> | text: <content>`.
+  - `header`: the path and the enclosing symbol. The embedding input is the header, then the first docstring when the chunk has one, then the content.
   - `identifiers`: each identifier in the chunk, plus its parts. `getUserById` gives `get user by id`.
 
 ### Tier 5: Data stores
@@ -271,7 +271,7 @@ AI Gateway fronts each model call. It records the model id, the tokens, and the 
 
 - **Embeddings.** The model is OpenRouter `mongodb/voyage-code-4`. It gives 1024 dimensions. The context window is 32,000 tokens. The model facts are in [retrieval-improvement-plan.md](retrieval-improvement-plan.md).
   - The model id is the constant `EMBEDDING_MODEL_ID` in `packages/domain`, not a Worker var. The gateway and the pipeline must use the same model, and the Vectorize dimension depends on it.
-  - A question uses `input_type` `query`. A chunk uses `input_type` `document` and the `title` and `text` form in the chunk rules.
+  - A question uses `input_type` `query`. A chunk uses `input_type` `document`. The chunk text is the header, then the first docstring when the chunk has one, then the content.
   - One request embeds one chunk. `EMBED_BATCH_SIZE` is 1. `EMBED_CONCURRENCY` is 10, so ten calls run at the same time.
   - The pipeline calls `mongodb/voyage-code-4` on OpenRouter. `OPENROUTER_API_KEY` and `CF_AIG_TOKEN` are pipeline secrets.
 - **Reranker.** The reranker is OpenRouter `mongodb/rerank-3`. The model facts are in [retrieval-improvement-plan.md](retrieval-improvement-plan.md).

@@ -17,7 +17,7 @@ A keyword index that cannot see `getUserById` as one name and as the parts `get`
 The note assumes a naive stack. These parts are already built.
 
 - Code chunks come from Tree-sitter. The split is the function, the method, or the class. An oversized node is split again by lines. Markdown is split on headings.
-- Each code chunk stores the symbol. The embedding text is `title: path symbol | text: content`.
+- Each code chunk stores the symbol. The embedding text is the header, then the first docstring when the chunk has one, then the content.
 - The keyword table copies `content` and `identifiers`. The identifier text keeps the full name and the split parts. `getUserById` is stored with `get user by id`.
 - The FTS tokenizer is `unicode61` with `tokenchars '_'`. An underscore stays inside a token. A dot does not. `auth.service.ts` becomes separate tokens.
 - The production path does not fuse lists. It takes the semantic top 8. A question that starts with "where is" moves the chunk whose symbol equals the last name to position 1. On that path, `identifierHitAt1` is 1.0 and recall is 0.7407.

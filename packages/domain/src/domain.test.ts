@@ -24,8 +24,15 @@ describe('parseRepositoryLink', () => {
 })
 
 describe('formatChunkInput', () => {
-  it('when a chunk has a header and content, then the input uses the title and text form', () => {
-    assert.equal(formatChunkInput('src/app.py App', 'class App:'), 'title: src/app.py App | text: class App:')
+  it('when a chunk has a header and content, then the input starts with the header', () => {
+    assert.equal(formatChunkInput('src/app.py App', 'class App:'), 'src/app.py App\nclass App:')
+  })
+
+  it('when the content has a docstring, then the input places that docstring after the header', () => {
+    const content = 'def one():\n    """Return one."""\n    return 1\n'
+    const input = formatChunkInput('src/app.py one', content)
+
+    assert.equal(input, `src/app.py one\nReturn one.\n${content}`)
   })
 })
 

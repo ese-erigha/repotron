@@ -46,7 +46,7 @@ Step 1 is a staging change, not a pull request. Step 2 is one pull request, and 
    - Set the vector dimension to 1024.
    - The gateway and the pipeline embed through OpenRouter with that model.
    - Keep the binding name `repotron-staging-chunks`.
-   - The embedding text is `title: path symbol | text: content`, plus the first docstring or the signature when the chunk has one.
+   - The embedding text is the header, then the first docstring or the signature when that text is not already the start of the content, then the content.
    - Turn off the 30-question eval on this pull request. Change `eval.yml` so the `eval` job does not score. The database is empty, and a red eval blocks the merge.
    - The skip stays until step 3 records the new floor. The pull request that records the floor removes the skip.
    - Merge this pull request. A push to `develop` deploys the gateway and the pipeline.
