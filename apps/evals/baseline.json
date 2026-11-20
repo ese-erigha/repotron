@@ -1,8 +1,8 @@
 {
-  "recall": 0.7407407407407407,
-  "precision": 0.10185185185185185,
-  "faithfulness": 0.9887495646116337,
-  "answerRelevance": 0.9016705977701913,
-  "citationAccuracy": 0.2159090909090909,
+  "recall": 0.6666666666666666,
+  "precision": 0.09722222222222222,
+  "faithfulness": 0.9936427432216905,
+  "answerRelevance": 0.8793902324316785,
+  "citationAccuracy": 0.15,
   "refusalAccuracy": 1.0
 }
