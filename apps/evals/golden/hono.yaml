@@ -1,6 +1,6 @@
 repository: honojs/hono
-commitSha: 676c8f80fcafc49e6e74c847a8f0d9c44cc7faee
-indexId: 438384984-676c8f80fcafc49e6e74c847a8f0d9c44cc7faee
+commitSha: 75ff8e3ea18485589816881c6278bc9783e56602
+indexId: 438384984-75ff8e3ea18485589816881c6278bc9783e56602
 questions:
   - id: hono-identifier-01
     kind: identifier

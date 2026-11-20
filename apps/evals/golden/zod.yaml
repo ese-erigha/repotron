@@ -1,6 +1,6 @@
 repository: colinhacks/zod
-commitSha: 90bf57b8e96a3729d766fff3185d39b2ab3ba016
-indexId: 245704608-90bf57b8e96a3729d766fff3185d39b2ab3ba016
+commitSha: e32e08836e451e26f53f5ff6efe4fb92b07a47ad
+indexId: 245704608-e32e08836e451e26f53f5ff6efe4fb92b07a47ad
 questions:
   - id: zod-identifier-01
     kind: identifier

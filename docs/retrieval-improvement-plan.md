@@ -26,9 +26,9 @@ The reranker is `mongodb/rerank-3` on OpenRouter. The price is $0.05 per million
 
 ## Re-index
 
-Clear the staging data first. Then change the code. Hybrid search and the reranker wait until the three pinned commits are in the new index. A hybrid test on the old vectors would be thrown away with those vectors.
+Clear the staging data first. Then change the code. Hybrid search and the reranker wait until the three repositories are in the new index. A hybrid test on the old vectors would be thrown away with those vectors.
 
-The re-index uses the pinned commits in `apps/evals/golden/*.yaml`. It does not use the tip of the default branch. The home page still indexes the branch tip for a visitor. The golden re-index passes the commit SHA into the existing workflow.
+The re-index uses the current head of the default branch. The home page does that. The old pins in `apps/evals/golden/*.yaml` stay unused for this index. After each index is `ready`, write the new commit SHA and the new index id into the golden file. Rewrite each expected line range. Flask's commit has not moved, so its ranges can stay. Zod and Hono have moved, so their ranges must be written again. Evals stay off until that new floor is recorded.
 
 ## Steps
 
@@ -51,8 +51,10 @@ Step 1 is a staging change, not a pull request. Step 2 is one pull request, and 
    - The skip stays until step 3 records the new floor. The pull request that records the floor removes the skip.
    - Merge this pull request. A push to `develop` deploys the gateway and the pipeline.
 3. Fill the index, then turn the eval back on.
-   - Index the three pinned commits with the deployed pipeline.
+   - Index `colinhacks/zod`, `honojs/hono`, and `pallets/flask` from the home page. Each index uses the current head of the default branch.
    - Keep the symbol move.
+   - After an index is `ready`, write its commit SHA and its index id into `apps/evals/golden`.
+   - Rewrite the expected line ranges for Zod and for Hono. Keep the Flask ranges. The Flask commit has not moved.
    - Run the 30 questions on semantic search plus the symbol move.
    - Record the new recall and the new `identifierHitAt1`. Those two numbers are the floor for steps 4 and 6.
    - Remove the eval skip in that same pull request. Later pull requests score again.
