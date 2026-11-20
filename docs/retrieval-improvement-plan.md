@@ -4,75 +4,72 @@ This plan is the path to a better search than the one on `develop` today. It use
 
 Hybrid search and the reranker are the work. Scope filters and the symbol trace wait.
 
+## Where we are
+
+The current stage is the chunk-text re-index. The code on `develop` already writes the new chunk text. Staging has no rows for Zod, Hono, or Flask. Index those three repositories again, then run the 30 questions once.
+
+Do not change the chunk text again before that run. If recall does not rise above 0.6667, and `identifierHitAt1` does not rise above 0.8333, stop this text change. The next stage is hybrid search.
+
 ## The floor we keep
 
-Do not remove these. They are the best measured path.
+Do not remove these.
 
 - Tree-sitter chunks at the function, method, or class. Markdown stays on headings.
 - The symbol on each code chunk, and the identifier text that keeps the full name plus the split parts.
 - The semantic top 8 from Vectorize.
 - The symbol move. A question that starts with "where is" puts the chunk whose symbol equals the last name in position 1.
-- On that path, `identifierHitAt1` is 1.0 and recall is 0.7407. Precision is 0.1019. Refusal is 1.0.
 
-Precision is the weak number. About 1 chunk in 8 overlaps the expected lines. Recall misses about 1 ground-truth range in 4. The symbol move fixed the first chunk for "where is" questions. It did not fix precision.
+The EmbeddingGemma index scored recall 0.7407 and `identifierHitAt1` 1.0. That index is gone.
+
+The first Voyage index, before the chunk-text change, scored recall 0.6667 and `identifierHitAt1` 0.8333. Precision was 0.0972. Faithfulness was 0.9936. Answer relevance was 0.8794. Citation accuracy was 0.15. Refusal was 1.0. Those six gate scores are in `apps/evals/baseline.json`. `identifierHitAt1` is not a key in that file.
 
 ## Models
 
-The index `repotron-staging-chunks` has 1024 dimensions. The embedding model is `mongodb/voyage-code-4` on OpenRouter. A 768-dimension index cannot store a 1024-number vector, so the old index was replaced.
+The index `repotron-staging-chunks` has 1024 dimensions and cosine distance. The name stays. The embedding model is `mongodb/voyage-code-4` on OpenRouter. The price is $0.12 per million tokens. The context window is 32,000 tokens. Questions use `input_type` `query`. Chunks use `input_type` `document`.
 
-The re-index model is `mongodb/voyage-code-4` on OpenRouter, at 1024 dimensions. The price is $0.12 per million tokens. The context window is 32,000 tokens. The answer model already uses that account.
+The embedding text is the header, then the first docstring when the chunk has one, then the content. A signature is added only when the content does not already start with it. The old `title:` and `text:` wrapper is gone. Vectors written before that change do not count.
 
-The reranker is `mongodb/rerank-3` on OpenRouter. The price is $0.05 per million tokens. OpenRouter lists a p50 latency of 0.17 s.
+The reranker is `mongodb/rerank-3` on OpenRouter. The price is $0.05 per million tokens. OpenRouter lists a p50 latency of 0.17 s. It is not on yet.
 
-## Re-index
+## Done
 
-Clear the staging data first. Then change the code. Hybrid search and the reranker wait until the three repositories are in the new index. A hybrid test on the old vectors would be thrown away with those vectors.
+1. `repotron-staging-chunks` was deleted and created again at 1024 dimensions. The string metadata indexes on `path`, `language`, and `kind` exist. The Vectorize index stays. Do not delete it for a repository cleanup.
+2. The gateway and the pipeline embed with `mongodb/voyage-code-4` through the Cloudflare AI Gateway OpenRouter route. That code is deployed.
+3. Zod, Hono, and Flask were indexed at the head of `main`. The golden files name those commits. The code ranges were still on the same lines, so the line numbers stayed. Flask's commit did not move.
+4. The manual eval on that index failed the old baseline. `baseline.json` now holds the six new gate scores.
+5. The chunk text change is merged and deployed. The three repositories were then removed from staging, including their vectors, R2 files, workflow instances, and D1 rows.
 
-The re-index uses the current head of the default branch. The home page does that. The old pins in `apps/evals/golden/*.yaml` stay unused for this index. After each index is `ready`, write the new commit SHA and the new index id into the golden file. Rewrite each expected line range. Flask's commit has not moved, so its ranges can stay. Zod and Hono have moved, so their ranges must be written again. Evals stay off until that new floor is recorded.
+## Next
 
-## Steps
+Index from the home page. Each URL uses the current head of `main`.
 
-Step 1 is a staging change, not a pull request. Step 2 is one pull request, and that pull request does not run the 30-question eval. Each later step is one pull request. Stop when the check fails. Do not hide a failure by starting the next step.
+- `https://github.com/colinhacks/zod`
+- `https://github.com/honojs/hono`
+- `https://github.com/pallets/flask`
 
-1. Clear staging, then recreate the vector index. Do this before the code pull request.
-   - Delete every row in `source_chunks`, then `answered_questions`, then `repository_indexes`, then `github_repositories`. The chunk delete clears `chunk_keywords`.
-   - Delete the objects in the R2 bucket `repotron-staging-batches`.
-   - Delete the Vectorize index `repotron-staging-chunks`.
-   - Create `repotron-staging-chunks` again with 1024 dimensions and cosine distance.
-   - Create the string metadata indexes on `path`, `language`, and `kind` before the first insert.
-   - This step is done. The index is 1024 dimensions.
-2. Switch the code to the new index. One pull request.
-   - Set `EMBEDDING_MODEL_ID` to `mongodb/voyage-code-4`.
-   - Set the vector dimension to 1024.
-   - The gateway and the pipeline embed through OpenRouter with that model.
-   - Keep the binding name `repotron-staging-chunks`.
-   - The embedding text is the header, then the first docstring or the signature when that text is not already the start of the content, then the content.
-   - Turn off the 30-question eval on this pull request. Change `eval.yml` so the `eval` job does not score. The database is empty, and a red eval blocks the merge.
-   - The skip stays until step 3 records the new floor. The pull request that records the floor removes the skip.
-   - Merge this pull request. A push to `develop` deploys the gateway and the pipeline.
-3. Fill the index, then turn the eval back on.
-   - Index `colinhacks/zod`, `honojs/hono`, and `pallets/flask` from the home page. Each index uses the current head of the default branch.
-   - Keep the symbol move.
-   - After an index is `ready`, write its commit SHA and its index id into `apps/evals/golden`.
-   - Rewrite the expected line ranges for Zod and for Hono. Keep the Flask ranges. The Flask commit has not moved.
-   - Run the 30 questions on semantic search plus the symbol move.
-   - Record the new recall and the new `identifierHitAt1`. Those two numbers are the floor for steps 4 and 6.
-   - Remove the eval skip in that same pull request. Later pull requests score again.
-4. Hybrid search. Do this on the new index only. Give the model the 8 semantic chunks plus one keyword chunk. Do not reorder the 8, and do not delete one of them.
+Wait until all three indexes are `ready`. If a head commit moved, write the new commit SHA and the new index id into `apps/evals/golden` before the eval. Then run the Eval workflow by hand on `develop`.
+
+Keep the result when recall is above 0.6667 and `identifierHitAt1` is above 0.8333. Update `baseline.json` when one of the six gate scores changes. When the two retrieval numbers do not rise, leave the chunk text as it is and start hybrid search.
+
+## Later steps
+
+One step is one pull request. Stop when the check fails. Do not hide a failure by starting the next step.
+
+1. Hybrid search. Do this on the index we keep. Give the model the 8 semantic chunks plus one keyword chunk. Do not reorder the 8, and do not delete one of them.
    - Run semantic search for the top 8, then the symbol move. A "where is" question still puts the named function first.
    - Run keyword search for the top 50.
    - If the first keyword chunk is already inside the 8, stop. The model receives those 8.
    - If it is not inside the 8, add it at the end. The model receives 9 chunks.
-   - Run the 30 questions. Merge only when recall and `identifierHitAt1` stay at the floor from step 3.
+   - Run the 30 questions. Merge only when recall and `identifierHitAt1` stay at the floor from the chunk-text run.
    - If recall drops, stop this step. Do not put the keyword chunk into one of the original 8 slots. That swap already failed.
-5. Reranker scores. Score the 20 pairs with `mongodb/rerank-3`. Do not change the order of chunks a user receives.
-   - Use the same 20 questions and the ground-truth chunks from the new index.
-   - Call `mongodb/rerank-3`. The passage is `title: path symbol | text: content`. The query text is the user question.
+2. Reranker scores. Score the 20 pairs with `mongodb/rerank-3`. Do not change the order of chunks a user receives.
+   - Use the same 20 questions and the ground-truth chunks from the index we keep.
+   - Call `mongodb/rerank-3`. The passage is the header, then the content. The query text is the user question.
    - Write the low score, the high score, and the sigmoid decision in `apps/evals/reranker-scores.md`.
    - Pass when every definition score is above the readme score for "What is Flask?" on this same run.
    - If a definition is still lower, stop. Do not sort with this model.
-6. Sort with `mongodb/rerank-3` after step 5 passes. On a "where is" question, the symbol-matched chunk stays first. Merge only when recall and `identifierHitAt1` stay at the floor from step 3, and retrieval p95 stays under 800 ms.
-7. Write the comparison. Score keyword search alone, semantic search alone, semantic search plus the extra keyword chunk, and that list after the reranker. Use the 30 questions. Split the scores by question kind. Commit the file as `apps/evals/ablation.json`. Do not change the production path in this pull request.
+3. Sort with `mongodb/rerank-3` after step 2 passes. On a "where is" question, the symbol-matched chunk stays first. Merge only when recall and `identifierHitAt1` stay at the floor from the chunk-text run, and retrieval p95 stays under 800 ms.
+4. Write the comparison. Score keyword search alone, semantic search alone, semantic search plus the extra keyword chunk, and that list after the reranker. Use the 30 questions. Split the scores by question kind. Commit the file as `apps/evals/ablation.json`. Do not change the production path in this pull request.
 
 ## What this plan refuses
 
@@ -81,12 +78,12 @@ Step 1 is a staging change, not a pull request. Step 2 is one pull request, and 
 - Do not call `@cf/baai/bge-reranker-base`. The measured scores put a readme ahead of a definition.
 - Do not replace Tree-sitter chunks with line windows. The line split remains only for a node that is too large.
 - Do not set `CONTEXT_CHUNKS` to 1.
+- Do not write another chunk-text wrapper before the chunk-text eval is recorded.
 
 ## Done when
 
 - A "where is" question still has the definition first.
-- Recall is above 0.7407 on the index we keep.
-- Precision is above 0.1019 on that index.
+- Recall and `identifierHitAt1` are at or above the floor from the chunk-text run.
 - Refusal stays at 1.0.
 - The reranker sorts only if a definition scores above a readme on the 20 pairs.
-- `repotron-staging-chunks` is deleted and created again at 1024 dimensions. The name stays.
+- `repotron-staging-chunks` stays at 1024 dimensions. The name stays.
