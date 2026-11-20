@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Deletes one repository from staging: Vectorize vectors, R2 batches, then the D1 rows.
+# Deletes one repository from staging: Vectorize vectors, R2 batches, the D1 rows, then the workflow instances.
 # The repository id is github_repositories.id, the numeric GitHub id stored as text.
 # Run it with `pnpm exec bash scripts/cleanup-repository.sh <repository id>`.
 # Vectors go first. A failed page stops the script, and the D1 rows are still there.
@@ -8,6 +8,8 @@ set -euo pipefail
 readonly DATABASE_NAME=repotron-staging-db
 readonly VECTOR_INDEX=repotron-staging-chunks
 readonly BUCKET=repotron-staging-batches
+readonly INDEXING_WORKFLOW=repotron-staging-repository-indexing
+readonly DELETION_WORKFLOW=repotron-staging-index-deletion
 readonly PAGE_SIZE=100
 readonly R2_PAGE_SIZE=1000
 
@@ -172,6 +174,35 @@ delete_chunk_pages() {
   fi
 }
 
+delete_workflow_instance() {
+  local workflow=$1
+  local instance=$2
+  local output
+  if output=$(cf workflows instances delete "$instance" --workflow-name "$workflow" --force 2>&1); then
+    printf '%s\n' "$output"
+    echo "Deleted workflow instance ${instance}."
+    return
+  fi
+  if printf '%s\n' "$output" | grep -qi "not found"; then
+    echo "Workflow instance ${instance} is already gone."
+    return
+  fi
+  printf '%s\n' "$output" >&2
+  exit 1
+}
+
+delete_workflow_instances() {
+  local index_id
+  if [[ ! -s "$work/indexes" ]]; then
+    echo "No index rows."
+    return
+  fi
+  while IFS= read -r index_id; do
+    delete_workflow_instance "$INDEXING_WORKFLOW" "$index_id"
+    delete_workflow_instance "$DELETION_WORKFLOW" "delete-${index_id}"
+  done <"$work/indexes"
+}
+
 delete_remaining_rows() {
   local db=$1
   query "$db" "DELETE FROM answered_questions WHERE index_id IN (SELECT id FROM repository_indexes WHERE repository_id = '${repository_id}')" >/dev/null
@@ -194,6 +225,7 @@ main() {
   delete_keyword_pages "$db"
   delete_chunk_pages "$db"
   delete_remaining_rows "$db"
+  delete_workflow_instances
   echo "Repository ${repository_id} is removed from staging."
 }
 

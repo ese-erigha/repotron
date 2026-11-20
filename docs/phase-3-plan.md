@@ -8,7 +8,7 @@ Do not implement the stages in one pull request. A red eval would not say which 
 
 ## Operation
 
-The order is the order in [retrieval-improvement-plan.md](retrieval-improvement-plan.md). Step 1 clears the staging rows and recreates `repotron-staging-chunks` at 1024 dimensions. Step 2 is the code pull request for `mongodb/voyage-code-4`, and that pull request does not run the 30-question eval. Hybrid search waits until the three pinned commits are in the new index.
+The order is the order in [retrieval-improvement-plan.md](retrieval-improvement-plan.md). Step 1 clears the staging rows and recreates `repotron-staging-chunks` at 1024 dimensions. Step 2 is the code pull request for `mongodb/voyage-code-4`, and that pull request does not run the 30-question eval. Hybrid search waits until the three repositories are indexed at the current head of the default branch.
 
 **Read first, in this order:**
 
@@ -46,7 +46,7 @@ The order is the order in [retrieval-improvement-plan.md](retrieval-improvement-
 
 **Out of scope.**
 
-- A second embedding model besides `mongodb/voyage-code-4` in [retrieval-improvement-plan.md](retrieval-improvement-plan.md). Step 1 recreates `repotron-staging-chunks`. Step 2 switches the code. The re-index uses the three pinned commits, not the branch tip.
+- A second embedding model besides `mongodb/voyage-code-4` in [retrieval-improvement-plan.md](retrieval-improvement-plan.md). Step 1 recreates `repotron-staging-chunks`. Step 2 switches the code. The re-index uses the current head of the default branch.
 - A new answer model.
 - A change to chunking. `CONTEXT_CHUNKS` stays 8 for the semantic list. The hybrid priority may add one keyword chunk beyond those 8.
 - The public dashboard and storing reports in R2 (Phase 4).

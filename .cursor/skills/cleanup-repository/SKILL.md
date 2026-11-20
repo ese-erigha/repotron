@@ -1,9 +1,10 @@
 ---
 name: cleanup-repository
 description: >-
-  Deletes one staging repository: Vectorize vectors, R2 batches, then the D1
-  rows. Use when the user asks to clean up, remove, or delete a repository by
-  repository id, github_repositories.id, or scripts/cleanup-repository.sh.
+  Deletes one staging repository: Vectorize vectors, R2 batches, the D1
+  rows, and the workflow instances. Use when the user asks to clean up,
+  remove, or delete a repository by repository id, github_repositories.id,
+  or scripts/cleanup-repository.sh.
 disable-model-invocation: true
 ---
 
@@ -24,7 +25,7 @@ The script deletes those rows in this order.
 5. Rows in `repository_indexes`. The `chunk_total` value goes with the row.
 6. The row in `github_repositories`.
 
-Vectors for that repository go first. R2 batch objects for that repository go next. Then the rows above. The Vectorize index stays. The R2 bucket stays.
+Vectors for that repository go first. R2 batch objects for that repository go next. Then the rows above. Then the workflow instances. The instance id for indexing is the index id. The instance id for deletion is `delete-` plus the index id. A missing instance is not a failure. The Vectorize index stays. The R2 bucket stays.
 
 ## Input
 
