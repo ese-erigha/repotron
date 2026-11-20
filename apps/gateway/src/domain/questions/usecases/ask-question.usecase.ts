@@ -17,7 +17,7 @@ import type { QuestionBody } from '../questions.schema.ts'
 import { getConfig, getRepositories } from '../../../context.ts'
 import { RequestError } from '../../../http-error.ts'
 import { consumeLimit, RATE_LIMIT_KIND } from '../../indexes/consume-limit.ts'
-import { keywordSearch, retrieveAnswerChunks, semanticSearch, type SearchInput } from '../retrieve-chunks.ts'
+import { keywordSearch, retrieveAnswerChunks, retrieveHybridChunks, semanticSearch, type SearchInput } from '../retrieve-chunks.ts'
 import { openAnswerStream } from '../stream-answer.ts'
 
 export type AskQuestionInput = {
@@ -80,6 +80,7 @@ async function retrieveQuestionChunks(
     const search: SearchInput = { indexId, question, limit: RETRIEVAL_TOP_K, scope }
     return keywordSearch(search)
   }
+  if (input.retrieval === RETRIEVAL_MODE.hybrid) return retrieveHybridChunks(indexId, question, scope)
   return retrieveAnswerChunks(indexId, question, scope)
 }
 

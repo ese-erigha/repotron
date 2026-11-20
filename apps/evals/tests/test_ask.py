@@ -46,6 +46,21 @@ def test_when_the_stream_drops_once_then_the_question_is_asked_again() -> None:
     assert result.answer == "ok"
 
 
+def test_when_retrieval_is_set_then_the_request_sends_that_mode() -> None:
+    seen: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(str(request.url))
+        return httpx.Response(201, text=_STREAM)
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    ask_question(
+        client, "https://gateway.test", "index-id", {"question": "Where?"}, "token", "hybrid"
+    )
+
+    assert seen[0].endswith("retrieval=hybrid")
+
+
 def test_when_the_stream_drops_twice_then_the_error_is_raised() -> None:
     def handler(_request: httpx.Request) -> httpx.Response:
         raise httpx.RemoteProtocolError("peer closed connection")

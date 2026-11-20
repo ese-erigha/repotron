@@ -4,7 +4,7 @@ import type { SourceChunkRecord } from 'db'
 
 import { gatewayStorage, type GatewayContext } from '../../context.ts'
 import type { GatewayEnv } from '../../env.ts'
-import { retrieveAnswerChunks } from './retrieve-chunks.ts'
+import { retrieveAnswerChunks, retrieveHybridChunks } from './retrieve-chunks.ts'
 
 const config = {
   APP_ORIGIN: 'https://repotron.example',
@@ -52,6 +52,22 @@ describe('retrieveAnswerChunks', () => {
     )
   })
 
+  it('when the hybrid list is built, then the rerank call is skipped', async () => {
+    let rerankCalls = 0
+    const chunks = await gatewayStorage.run(
+      context(['semantic'], ['keyword'], undefined, () => {
+        rerankCalls += 1
+      }),
+      () => retrieveHybridChunks('9-abc', 'How does routing work?'),
+    )
+
+    assert.equal(rerankCalls, 0)
+    assert.deepEqual(
+      chunks.map((chunk) => chunk.id),
+      ['semantic', 'keyword'],
+    )
+  })
+
   it('when the question asks where a symbol is, then that chunk stays first even if another chunk scores higher', async () => {
     const chunks = await gatewayStorage.run(context(['other', 'named'], ['other'], { other: 0.9, named: 0.1 }), () =>
       retrieveAnswerChunks('9-abc', 'Where is named defined?'),
@@ -68,9 +84,13 @@ function context(
   vectorIds: string[],
   keywordIds: string[],
   scores?: Record<string, number>,
+  onRerank?: () => void,
 ): GatewayContext {
   globalThis.fetch = (async (url: string, init?: { body?: unknown }) => {
-    if (url.endsWith('/rerank')) return Response.json({ results: rerankResults(init?.body, scores) })
+    if (url.endsWith('/rerank')) {
+      onRerank?.()
+      return Response.json({ results: rerankResults(init?.body, scores) })
+    }
     return Response.json({ data: [{ embedding: [0.1], index: 0 }] })
   }) as typeof fetch
   const rows = new Map([...vectorIds, ...keywordIds].map((id) => [id, chunk(id)]))
