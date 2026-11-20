@@ -23,7 +23,7 @@ def test_when_the_recorded_scores_are_between_zero_and_one_then_the_sigmoid_is_s
     assert f"rerank-low: {RERANK_LOW}" in text
     assert f"rerank-high: {RERANK_HIGH}" in text
     assert "rerank-sigmoid: skip" in text
-    assert "Do not sort with this model." in text
+    assert "The function scores above the readme for the same question." in text
     assert needs_sigmoid(RECORDED_LOW, RECORDED_HIGH) is False
     assert needs_sigmoid(TITLE_LOW, TITLE_HIGH) is False
     assert needs_sigmoid(RERANK_LOW, RERANK_HIGH) is False

@@ -41,8 +41,19 @@ describe('retrieveAnswerChunks', () => {
     )
   })
 
-  it('when the question asks where a symbol is, then that chunk stays first', async () => {
-    const chunks = await gatewayStorage.run(context(['other', 'named'], ['other']), () =>
+  it('when the keyword chunk scores higher, then it moves ahead of the semantic chunk', async () => {
+    const chunks = await gatewayStorage.run(context(['semantic'], ['keyword'], { keyword: 0.9, semantic: 0.2 }), () =>
+      retrieveAnswerChunks('9-abc', 'How does routing work?'),
+    )
+
+    assert.deepEqual(
+      chunks.map((chunk) => chunk.id),
+      ['keyword', 'semantic'],
+    )
+  })
+
+  it('when the question asks where a symbol is, then that chunk stays first even if another chunk scores higher', async () => {
+    const chunks = await gatewayStorage.run(context(['other', 'named'], ['other'], { other: 0.9, named: 0.1 }), () =>
       retrieveAnswerChunks('9-abc', 'Where is named defined?'),
     )
 
@@ -53,8 +64,15 @@ describe('retrieveAnswerChunks', () => {
   })
 })
 
-function context(vectorIds: string[], keywordIds: string[]): GatewayContext {
-  globalThis.fetch = (async () => Response.json({ data: [{ embedding: [0.1], index: 0 }] })) as typeof fetch
+function context(
+  vectorIds: string[],
+  keywordIds: string[],
+  scores?: Record<string, number>,
+): GatewayContext {
+  globalThis.fetch = (async (url: string, init?: { body?: unknown }) => {
+    if (url.endsWith('/rerank')) return Response.json({ results: rerankResults(init?.body, scores) })
+    return Response.json({ data: [{ embedding: [0.1], index: 0 }] })
+  }) as typeof fetch
   const rows = new Map([...vectorIds, ...keywordIds].map((id) => [id, chunk(id)]))
   return {
     config,
@@ -72,6 +90,31 @@ function context(vectorIds: string[], keywordIds: string[]): GatewayContext {
       query: async () => ({ matches: vectorIds.map((id) => ({ id })) }),
     },
   } as unknown as GatewayContext
+}
+
+function rerankResults(
+  body: unknown,
+  scores?: Record<string, number>,
+): { index: number; relevance_score: number }[] {
+  const documents = documentsFrom(body)
+  return documents.map((document, index) => ({
+    index,
+    relevance_score: scoreFor(document, index, documents.length, scores),
+  }))
+}
+
+function documentsFrom(body: unknown): string[] {
+  if (typeof body !== 'string') return []
+  const parsed: unknown = JSON.parse(body)
+  if (typeof parsed !== 'object' || parsed === null || !('documents' in parsed)) return []
+  const documents = parsed.documents
+  return Array.isArray(documents) ? documents.filter((item): item is string => typeof item === 'string') : []
+}
+
+function scoreFor(document: string, index: number, count: number, scores?: Record<string, number>): number {
+  if (!scores) return count - index
+  const match = Object.keys(scores).find((id) => document.includes(id))
+  return match ? (scores[match] ?? 0) : 0
 }
 
 function chunk(id: string): SourceChunkRecord {
