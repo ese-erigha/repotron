@@ -40,9 +40,23 @@ export async function retrieveAnswerChunks(
   question: string,
   scope?: SearchScope,
 ): Promise<SourceChunkRecord[]> {
-  const search: SearchInput = { indexId, question, limit: CONTEXT_CHUNKS, scope }
-  const chunks = await semanticSearch(search)
-  return promoteSymbolHit(chunks, question)
+  const semantic: SearchInput = { indexId, question, limit: CONTEXT_CHUNKS, scope }
+  const keywords: SearchInput = { indexId, question, limit: RETRIEVAL_TOP_K, scope }
+  const [semanticChunks, keywordChunks] = await Promise.all([
+    semanticSearch(semantic),
+    keywordSearch(keywords),
+  ])
+  const chunks = promoteSymbolHit(semanticChunks, question)
+  return appendKeywordChunk(chunks, keywordChunks[0])
+}
+
+function appendKeywordChunk(
+  chunks: SourceChunkRecord[],
+  keyword: SourceChunkRecord | undefined,
+): SourceChunkRecord[] {
+  if (!keyword) return chunks
+  if (chunks.some((chunk) => chunk.id === keyword.id)) return chunks
+  return [...chunks, keyword]
 }
 
 async function vectorIds(
