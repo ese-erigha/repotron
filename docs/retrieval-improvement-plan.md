@@ -6,9 +6,9 @@ Hybrid search and the reranker are the work. Scope filters and the symbol trace 
 
 ## Where we are
 
-The current stage is the chunk-text re-index. The code on `develop` already writes the new chunk text. Staging has no rows for Zod, Hono, or Flask. Index those three repositories again, then run the 30 questions once.
+The current stage is hybrid search. The chunk-text re-index is done. Recall stayed 0.6667. `identifierHitAt1` rose to 1.0. Do not write another chunk-text wrapper.
 
-Do not change the chunk text again before that run. If recall does not rise above 0.6667, and `identifierHitAt1` does not rise above 0.8333, stop this text change. The next stage is hybrid search.
+This pull request keeps the 8 semantic chunks and the symbol move. It adds the first keyword chunk at the end when that chunk is not already in the 8.
 
 ## The floor we keep
 
@@ -21,7 +21,7 @@ Do not remove these.
 
 The EmbeddingGemma index scored recall 0.7407 and `identifierHitAt1` 1.0. That index is gone.
 
-The first Voyage index, before the chunk-text change, scored recall 0.6667 and `identifierHitAt1` 0.8333. Precision was 0.0972. Faithfulness was 0.9936. Answer relevance was 0.8794. Citation accuracy was 0.15. Refusal was 1.0. Those six gate scores are in `apps/evals/baseline.json`. `identifierHitAt1` is not a key in that file.
+The first Voyage index, before the chunk-text change, scored recall 0.6667 and `identifierHitAt1` 0.8333. The chunk-text re-index kept recall at 0.6667 and raised `identifierHitAt1` to 1.0. Precision was 0.1019. Faithfulness was 0.9944. Answer relevance was 0.8910. Citation accuracy was 0.1640. Refusal was 1.0. Those six gate scores are in `apps/evals/baseline.json`. `identifierHitAt1` is not a key in that file.
 
 ## Models
 
@@ -41,21 +41,13 @@ The reranker is `mongodb/rerank-3` on OpenRouter. The price is $0.05 per million
 
 ## Next
 
-Index from the home page. Each URL uses the current head of `main`.
-
-- `https://github.com/colinhacks/zod`
-- `https://github.com/honojs/hono`
-- `https://github.com/pallets/flask`
-
-Wait until all three indexes are `ready`. If a head commit moved, write the new commit SHA and the new index id into `apps/evals/golden` before the eval. Then run the Eval workflow by hand on `develop`.
-
-Keep the result when recall is above 0.6667 and `identifierHitAt1` is above 0.8333. Update `baseline.json` when one of the six gate scores changes. When the two retrieval numbers do not rise, leave the chunk text as it is and start hybrid search.
+This pull request is hybrid search. The eval on this pull request asks the 30 questions. Merge only when recall stays at 0.6667 and `identifierHitAt1` stays at 1.0. If recall drops, revert this step. Do not swap a keyword chunk into one of the original 8 slots.
 
 ## Later steps
 
 One step is one pull request. Stop when the check fails. Do not hide a failure by starting the next step.
 
-1. Hybrid search. Do this on the index we keep. Give the model the 8 semantic chunks plus one keyword chunk. Do not reorder the 8, and do not delete one of them.
+1. Hybrid search. This is the current pull request. Give the model the 8 semantic chunks plus one keyword chunk. Do not reorder the 8, and do not delete one of them.
    - Run semantic search for the top 8, then the symbol move. A "where is" question still puts the named function first.
    - Run keyword search for the top 50.
    - If the first keyword chunk is already inside the 8, stop. The model receives those 8.
