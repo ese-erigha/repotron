@@ -128,6 +128,28 @@ delete_batches() {
   done <"$work/indexes"
 }
 
+delete_keyword_pages() {
+  local -a page=()
+  local id list
+  if [[ ! -s "$work/chunks" ]]; then
+    return
+  fi
+  while IFS= read -r id; do
+    page+=("'$id'")
+    if ((${#page[@]} == PAGE_SIZE)); then
+      list=$(IFS=,; echo "${page[*]}")
+      query "$1" "DELETE FROM chunk_keywords WHERE chunk_id IN (${list})" >/dev/null
+      echo "Deleted ${#page[@]} keyword rows."
+      page=()
+    fi
+  done <"$work/chunks"
+  if ((${#page[@]} > 0)); then
+    list=$(IFS=,; echo "${page[*]}")
+    query "$1" "DELETE FROM chunk_keywords WHERE chunk_id IN (${list})" >/dev/null
+    echo "Deleted ${#page[@]} keyword rows."
+  fi
+}
+
 delete_chunk_pages() {
   local -a page=()
   local id list
@@ -169,6 +191,7 @@ main() {
   load_chunk_ids "$db"
   delete_vector_pages
   delete_batches
+  delete_keyword_pages "$db"
   delete_chunk_pages "$db"
   delete_remaining_rows "$db"
   echo "Repository ${repository_id} is removed from staging."
