@@ -32,11 +32,12 @@ def ask_question(
     index_id: str,
     body: dict[str, str],
     token: str,
+    retrieval: str = "",
 ) -> AnswerResult:
     try:
-        return _post_question(client, origin, index_id, body, token)
+        return _post_question(client, origin, index_id, body, token, retrieval)
     except httpx.HTTPError:
-        return _post_question(client, origin, index_id, body, token)
+        return _post_question(client, origin, index_id, body, token, retrieval)
 
 
 def _post_question(
@@ -45,10 +46,14 @@ def _post_question(
     index_id: str,
     body: dict[str, str],
     token: str,
+    retrieval: str,
 ) -> AnswerResult:
+    params = {"debug": "true"}
+    if retrieval != "":
+        params["retrieval"] = retrieval
     response = client.post(
         f"{origin}/api/v1/indexes/{index_id}/questions",
-        params={"debug": "true"},
+        params=params,
         headers={EVAL_HEADER: token, "content-type": "application/json"},
         json=body,
     )

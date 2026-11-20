@@ -139,6 +139,33 @@ describe('askQuestion', () => {
     assert.equal(keyword.match.includes('"getUserById"'), true)
     assert.equal(vectorQueries, 0)
   })
+
+  it('when the eval token matches and retrieval is hybrid, then the question searches vectors and keywords', async () => {
+    const keyword = { indexId: '', match: '' }
+    let vectorQueries = 0
+    const stream = await gatewayStorage.run(
+      context({
+        calls: { n: 0 },
+        allowed: true,
+        keyword,
+        onVectorQuery: () => {
+          vectorQueries += 1
+        },
+      }),
+      () =>
+        askQuestion({
+          indexId: '9-abc',
+          body: { question: 'Where is getUserById?' },
+          remoteIp: '203.0.113.5',
+          evalToken: 'eval-token',
+          retrieval: 'hybrid',
+        }),
+    )
+    await new Response(stream).text()
+
+    assert.equal(keyword.indexId, '9-abc')
+    assert.equal(vectorQueries, 1)
+  })
 })
 
 function context(input: {

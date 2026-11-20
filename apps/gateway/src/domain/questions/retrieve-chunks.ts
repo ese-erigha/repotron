@@ -36,7 +36,7 @@ export async function keywordSearch(input: SearchInput): Promise<SourceChunkReco
   return rowsInScope(rows, input.scope).slice(0, input.limit)
 }
 
-export async function retrieveAnswerChunks(
+export async function retrieveHybridChunks(
   indexId: string,
   question: string,
   scope?: SearchScope,
@@ -47,8 +47,16 @@ export async function retrieveAnswerChunks(
     semanticSearch(semantic),
     keywordSearch(keywords),
   ])
-  const chunks = promoteSymbolHit(semanticChunks, question)
-  const combined = appendKeywordChunk(chunks, keywordChunks[0])
+  const combined = appendKeywordChunk(semanticChunks, keywordChunks[0])
+  return promoteSymbolHit(combined, question)
+}
+
+export async function retrieveAnswerChunks(
+  indexId: string,
+  question: string,
+  scope?: SearchScope,
+): Promise<SourceChunkRecord[]> {
+  const combined = await retrieveHybridChunks(indexId, question, scope)
   const ordered = await orderByRerank(question, combined)
   return promoteSymbolHit(ordered, question)
 }
