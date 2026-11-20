@@ -71,3 +71,40 @@ The 20 scores with the title:
 - zod-identifier-02: 0.0007324513280764222
 
 The title does not fix the order. Zod definitions stay near 0. Flask concept pairs stay near 1. Stage 6 does not sort the answer list by this score.
+
+## mongodb/rerank-3
+
+The model is OpenRouter `mongodb/rerank-3`. These are the same 20 pairs. The passage is the header, then the content. The query text is the user question. The run was on 20 November 2026. The chunks a user receives stay in the current order.
+
+rerank-low: 0.5245599746704102
+
+rerank-high: 0.9392402172088623
+
+rerank-sigmoid: skip
+
+Every score is between 0 and 1. The gateway does not apply a sigmoid.
+
+The 20 scores:
+
+- flask-identifier-01: 0.8271173238754272
+- flask-identifier-02: 0.8927371501922607
+- flask-concept-01: 0.9370020031929016
+- flask-concept-02: 0.9073042273521423
+- flask-architecture-01: 0.9392402172088623
+- flask-architecture-02: 0.763560950756073
+- flask-start-01: 0.5245599746704102
+- flask-feature-01: 0.643302321434021
+- flask-feature-02: 0.7635424733161926
+- hono-identifier-01: 0.8952884078025818
+- hono-identifier-02: 0.7843691110610962
+- hono-concept-01: 0.8518349528312683
+- hono-concept-02: 0.8856191039085388
+- hono-architecture-01: 0.8137436509132385
+- hono-architecture-02: 0.9336104989051819
+- hono-start-01: 0.6280539035797119
+- hono-feature-01: 0.5663411021232605
+- hono-feature-02: 0.6066926121711731
+- zod-identifier-01: 0.8116143345832825
+- zod-identifier-02: 0.8468188643455505
+
+The highest score is "What is Flask?". Every definition scores below that readme. Do not sort with this model.
