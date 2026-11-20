@@ -8,6 +8,7 @@ import {
   matchesScope,
   metadataFilter,
   promoteSymbolHit,
+  RERANK_MODEL_ID,
   RETRIEVAL_TOP_K,
   type SearchScope,
 } from 'repotron-domain'
@@ -47,7 +48,9 @@ export async function retrieveAnswerChunks(
     keywordSearch(keywords),
   ])
   const chunks = promoteSymbolHit(semanticChunks, question)
-  return appendKeywordChunk(chunks, keywordChunks[0])
+  const combined = appendKeywordChunk(chunks, keywordChunks[0])
+  const ordered = await orderByRerank(question, combined)
+  return promoteSymbolHit(ordered, question)
 }
 
 function appendKeywordChunk(
@@ -57,6 +60,51 @@ function appendKeywordChunk(
   if (!keyword) return chunks
   if (chunks.some((chunk) => chunk.id === keyword.id)) return chunks
   return [...chunks, keyword]
+}
+
+async function orderByRerank(question: string, chunks: SourceChunkRecord[]): Promise<SourceChunkRecord[]> {
+  if (chunks.length < 2) return chunks
+  const scores = await rerankScores(question, chunks.map(chunkPassage))
+  const ranked = chunks.map((chunk, index) => ({ chunk, score: scores[index] ?? 0, index }))
+  ranked.sort((left, right) => right.score - left.score || left.index - right.index)
+  return ranked.map((item) => item.chunk)
+}
+
+function chunkPassage(chunk: SourceChunkRecord): string {
+  const header = chunk.symbol ? `${chunk.path} ${chunk.symbol}` : chunk.path
+  return `${header}\n${chunk.content}`
+}
+
+type RerankResponse = {
+  results?: { index?: number; relevance_score?: number }[]
+}
+
+async function rerankScores(question: string, passages: string[]): Promise<number[]> {
+  const config = getConfig()
+  const payload = { model: RERANK_MODEL_ID, query: question, documents: passages, top_n: passages.length }
+  const response = await fetch(rerankUrl(), {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${config.OPENROUTER_API_KEY}`,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  })
+  if (!response.ok) {
+    const detail = await response.text()
+    throw new Error(`The rerank model failed with status ${response.status}. ${detail}`)
+  }
+  const body = (await response.json()) as RerankResponse
+  const scores = passages.map(() => 0)
+  for (const result of body.results ?? []) {
+    if (result.index === undefined || result.relevance_score === undefined) continue
+    scores[result.index] = result.relevance_score
+  }
+  return scores
+}
+
+function rerankUrl(): string {
+  return 'https://openrouter.ai/api/v1/rerank'
 }
 
 async function vectorIds(

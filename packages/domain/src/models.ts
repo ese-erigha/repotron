@@ -1,4 +1,5 @@
 export const EMBEDDING_MODEL_ID = 'mongodb/voyage-code-4'
+export const RERANK_MODEL_ID = 'mongodb/rerank-3'
 export const EMBEDDING_INPUT = {
   query: 'query',
   document: 'document',

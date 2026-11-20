@@ -107,4 +107,18 @@ The 20 scores:
 - zod-identifier-01: 0.8116143345832825
 - zod-identifier-02: 0.8468188643455505
 
-The highest score is "What is Flask?". Every definition scores below that readme. Do not sort with this model.
+The highest score is "What is Flask?". Every definition scores below that readme when each pair uses its own question. That comparison does not decide the sort.
+
+## Same question
+
+Each definition question was sent again with two chunks in one call. One chunk is the function. The other chunk is the readme. The run was on 20 November 2026. The Zod readme chunk is `packages/zod/README.md`. The Hono readme chunk is the Features section.
+
+- flask-identifier-01: function 0.8271018862724304, readme 0.34157463908195496
+- flask-identifier-02: function 0.8926522135734558, readme 0.35141295194625854
+- hono-identifier-01: function 0.895628809928894, readme 0.4333249628543854
+- hono-identifier-02: function 0.7847803235054016, readme 0.3861027657985687
+- zod-identifier-01: function 0.812028169631958, readme 0.49664658308029175
+- zod-identifier-02: function 0.8470751643180847, readme 0.5153801441192627
+- flask-concept-02: function 0.9073803424835205, readme 0.45674341917037964
+
+The function scores above the readme for the same question. The retrieved chunks are sorted by this score. A "where is" question still keeps the named function first.

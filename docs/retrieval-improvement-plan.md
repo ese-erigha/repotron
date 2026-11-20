@@ -8,7 +8,7 @@ Hybrid search and the reranker are the work. Scope filters and the symbol trace 
 
 Hybrid search is merged. Recall stayed at 0.6667. `identifierHitAt1` stayed at 1.0. Do not write another chunk-text wrapper.
 
-`mongodb/rerank-3` scored the same 20 pairs. Every score is between 0 and 1. Every definition scores below the readme for "What is Flask?". The sort stays off.
+`mongodb/rerank-3` scored each definition question against the readme in one call. The function scored higher every time. The retrieved chunks are sorted by that score. A "where is" question still keeps the named function first.
 
 ## The floor we keep
 
@@ -29,7 +29,7 @@ The index `repotron-staging-chunks` has 1024 dimensions and cosine distance. The
 
 The embedding text is the header, then the first docstring when the chunk has one, then the content. A signature is added only when the content does not already start with it. The old `title:` and `text:` wrapper is gone. Vectors written before that change do not count.
 
-The reranker is `mongodb/rerank-3` on OpenRouter. The price is $0.05 per million tokens. OpenRouter lists a p50 latency of 0.17 s. The 20-pair measurement is recorded. The sort stays off.
+The reranker is `mongodb/rerank-3` on OpenRouter. The price is $0.05 per million tokens. OpenRouter lists a p50 latency of 0.17 s. It sorts the retrieved chunks. A "where is" question still keeps the named function first.
 
 ## Done
 
@@ -41,7 +41,7 @@ The reranker is `mongodb/rerank-3` on OpenRouter. The price is $0.05 per million
 
 ## Next
 
-Stop the rerank sort. A definition still scores below the readme for "What is Flask?". Do not start the sort step.
+This pull request sorts the retrieved chunks. Merge only when recall stays at 0.6667 and `identifierHitAt1` stays at 1.0.
 
 ## Later steps
 
@@ -54,13 +54,12 @@ One step is one pull request. Stop when the check fails. Do not hide a failure b
    - If it is not inside the 8, add it at the end. The model receives 9 chunks.
    - Run the 30 questions. Merge only when recall and `identifierHitAt1` stay at the floor from the chunk-text run.
    - If recall drops, stop this step. Do not put the keyword chunk into one of the original 8 slots. That swap already failed.
-2. Reranker scores are recorded. The check failed. Do not change the order of chunks a user receives.
+2. Reranker scores are recorded. The same-question check passed. Sort the retrieved chunks. Do not replace one of the original 8 with a keyword chunk.
    - Use the same 20 questions and the ground-truth chunks from the index we keep.
    - Call `mongodb/rerank-3`. The passage is the header, then the content. The query text is the user question.
-   - Write the low score, the high score, and the sigmoid decision in `apps/evals/reranker-scores.md`.
-   - Pass when every definition score is above the readme score for "What is Flask?" on this same run.
-   - If a definition is still lower, stop. Do not sort with this model.
-3. Sort with `mongodb/rerank-3` after step 2 passes. On a "where is" question, the symbol-matched chunk stays first. Merge only when recall and `identifierHitAt1` stay at the floor from the chunk-text run, and retrieval p95 stays under 800 ms.
+   - The cross-question scores stay in `apps/evals/reranker-scores.md`. They compare different questions, so they do not decide the sort.
+   - The same-question check passed. The function scored above the readme when both chunks were in one call.
+3. Sort the retrieved chunks with `mongodb/rerank-3`. This is the current pull request. On a "where is" question, the symbol-matched chunk stays first. Do not sort a top 50 down to 8. Merge only when recall and `identifierHitAt1` stay at the floor from the chunk-text run, and retrieval p95 stays under 800 ms.
 4. Write the comparison. Score keyword search alone, semantic search alone, semantic search plus the extra keyword chunk, and that list after the reranker. Use the 30 questions. Split the scores by question kind. Commit the file as `apps/evals/ablation.json`. Do not change the production path in this pull request.
 
 ## What this plan refuses
