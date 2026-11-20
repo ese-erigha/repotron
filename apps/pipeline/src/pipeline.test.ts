@@ -11,6 +11,25 @@ import { readParseResult } from './indexer-container/parse-result.ts'
 import { storeBatch } from './repository-indexing/store-batch.ts'
 import { assertVectorsReady } from './repository-indexing/wait-for-vectors.ts'
 
+let embedTrack: { active: number; max: number } | null = null
+
+globalThis.fetch = (async (_url: unknown, init?: RequestInit) => {
+  const payload = JSON.parse(String(init?.body)) as { input: string[] }
+  const watch = embedTrack
+  const numbered = payload.input.every((text) => text.startsWith('text-'))
+  if (watch && numbered) {
+    watch.active += 1
+    watch.max = Math.max(watch.max, watch.active)
+    await setTimeout(20)
+    watch.active -= 1
+  }
+  const data = payload.input.map((text, index) => ({
+    index,
+    embedding: [text.startsWith('text-') ? Number(text.slice('text-'.length)) : 0.1],
+  }))
+  return Response.json({ data })
+}) as typeof fetch
+
 describe('assertVectorsReady', () => {
   it('when the vectors were processed before the last upsert, then the error names both times', async () => {
     const context = vectorsContext('2026-01-01T00:00:00.000Z')
@@ -39,9 +58,11 @@ describe('assertVectorsReady', () => {
   })
 })
 
-describe('embedTexts', () => {
+describe('embedTexts', { concurrency: false }, () => {
   it('when 12 texts are embedded, then 10 calls run together', async () => {
+    embedTrack = { active: 0, max: 0 }
     const run = await embedNumberedTexts(12)
+    embedTrack = null
 
     assert.equal(run.maxActive, 10)
   })
@@ -134,24 +155,17 @@ describe('readParseResult', () => {
 })
 
 async function embedNumberedTexts(count: number): Promise<{ maxActive: number; vectors: number[][] }> {
-  let active = 0
-  let maxActive = 0
   const texts = Array.from({ length: count }, (_, index) => `text-${index}`)
   const context = {
-    config: { AI_GATEWAY_ID: 'gateway' },
-    ai: {
-      run: async (_model: string, input: { input: string[] }) => {
-        active += 1
-        maxActive = Math.max(maxActive, active)
-        await setTimeout(20)
-        active -= 1
-        const text = input.input[0] ?? ''
-        return { data: [{ embedding: [Number(text.slice('text-'.length))] }] }
-      },
+    config: {
+      AI_GATEWAY_ID: 'gateway',
+      CLOUDFLARE_ACCOUNT_ID: 'account',
+      OPENROUTER_API_KEY: 'openrouter',
+      CF_AIG_TOKEN: 'gateway-token',
     },
   } as unknown as PipelineContext
   const vectors = await pipelineStorage.run(context, () => embedTexts(texts))
-  return { maxActive, vectors }
+  return { maxActive: embedTrack?.max ?? 0, vectors }
 }
 
 function chunkLine(seq: number): string {
@@ -177,7 +191,12 @@ function batchContext(input: {
 }): PipelineContext {
   let stored = 0
   return {
-    config: { AI_GATEWAY_ID: 'gateway' },
+    config: {
+      AI_GATEWAY_ID: 'gateway',
+      CLOUDFLARE_ACCOUNT_ID: 'account',
+      OPENROUTER_API_KEY: 'openrouter',
+      CF_AIG_TOKEN: 'gateway-token',
+    },
     batches: { get: async () => ({ text: async () => input.text }) },
     repositories: {
       sourceChunks: {

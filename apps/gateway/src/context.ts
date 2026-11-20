@@ -28,21 +28,12 @@ export type VectorIndex = {
   ): Promise<{ matches?: { id: string }[] }>
 }
 
-export type AiBinding = {
-  run(
-    model: string,
-    input: { input: string[] },
-    options: { gateway: { id: string } },
-  ): Promise<{ data?: { embedding?: number[] }[] }>
-}
-
 type RateLimiterStub = { consume(kind: RateLimitKind): Promise<RateLimitDecision> }
 
 export type GatewayContext = {
   config: GatewayEnv
   repositories: RepotronRepositories
   vectors: VectorIndex
-  ai: AiBinding
   repositoryIndexing: RepositoryIndexingClient
   rateLimiter: { getByName(name: string): RateLimiterStub }
   execution: { waitUntil(promise: Promise<unknown>): void }
@@ -55,7 +46,6 @@ export function gatewayContext(source: Record<string, unknown>, execution: Gatew
     config: readGatewayEnv(source),
     repositories: new RepotronRepositories(createDatabase(source.DB as Parameters<typeof createDatabase>[0])),
     vectors: source.CHUNK_VECTORS as VectorIndex,
-    ai: source.AI as AiBinding,
     repositoryIndexing: source.REPOSITORY_INDEXING as RepositoryIndexingClient,
     rateLimiter: source.RATE_LIMITER as GatewayContext['rateLimiter'],
     execution,
@@ -72,10 +62,6 @@ export function getRepositories(): RepotronRepositories {
 
 export function getVectors(): VectorIndex {
   return context().vectors
-}
-
-export function getAi(): AiBinding {
-  return context().ai
 }
 
 export function getRepositoryIndexing(): RepositoryIndexingClient {

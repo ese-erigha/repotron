@@ -6,7 +6,7 @@ set -euo pipefail
 readonly BUCKET=repotron-staging-batches
 readonly BUCKET_LOCATION=enam
 readonly VECTOR_INDEX=repotron-staging-chunks
-readonly VECTOR_DIMENSIONS=768
+readonly VECTOR_DIMENSIONS=1024
 readonly VECTOR_METRIC=cosine
 readonly METADATA_PROPERTIES=(path language kind)
 readonly METADATA_TYPE=string

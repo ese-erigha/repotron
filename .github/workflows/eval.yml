@@ -59,6 +59,12 @@ jobs:
       - name: Decide whether to score
         id: gate
         run: |
+          if [ -f apps/evals/skip-score ]; then
+            echo "score=false" >> "$GITHUB_OUTPUT"
+            echo "migrations=false" >> "$GITHUB_OUTPUT"
+            echo "The 30-question eval is off until apps/evals/skip-score is removed."
+            exit 0
+          fi
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "score=true" >> "$GITHUB_OUTPUT"
             echo "migrations=false" >> "$GITHUB_OUTPUT"

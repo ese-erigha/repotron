@@ -125,8 +125,8 @@ describe('fuseRanks', () => {
 })
 
 describe('formatQueryInput', () => {
-  it('when a question is embedded, then the input uses the search task prefix', () => {
-    assert.equal(formatQueryInput('Where is main?'), 'task: search result | query: Where is main?')
+  it('when a question is embedded, then the input is the question text', () => {
+    assert.equal(formatQueryInput('Where is main?'), 'Where is main?')
   })
 })
 

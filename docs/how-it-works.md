@@ -22,7 +22,7 @@ Repotron answers a question about a public GitHub repository. The answer cites a
   - A large class splits at its methods.
   - A README splits at its headings.
   - This step uses a parser. It uses no model.
-- The embedding model `@cf/google/embeddinggemma-2` turns each chunk into a list of numbers.
+- The embedding model `mongodb/voyage-code-4` turns each chunk into a list of numbers.
   - Chunks with a similar meaning get similar numbers.
   - Repotron stores the chunk text and the numbers.
 - The status changes to ready. The user can ask a question.
@@ -37,7 +37,7 @@ Repotron answers a question about a public GitHub repository. The answer cites a
 Phase 1 uses this path.
 
 - The user types a question, or presses a preset button.
-- Repotron turns the question into numbers with `@cf/google/embeddinggemma-2`.
+- Repotron turns the question into numbers with `mongodb/voyage-code-4`.
 - It compares those numbers with the stored chunks and keeps the 8 closest chunks.
 - It sends the question and those 8 chunks to `anthropic/claude-haiku-5.5` on OpenRouter.
   - The model may answer only from those chunks.

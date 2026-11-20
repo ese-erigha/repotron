@@ -103,7 +103,7 @@ The pipeline Worker sets the status to `embedding` and stores the file count and
 1. Read the JSONL object from R2. The object holds up to 500 chunks.
 2. Take the next 10 chunks.
    - Insert those rows into `source_chunks`. One statement inserts one chunk. The row exists before the vector does.
-   - Embed the chunk text with Workers AI `@cf/google/embeddinggemma-2`. Each string is `title: <header> | text: <content>`. Each call sends one text. The 10 calls run at the same time.
+   - Embed the chunk text with OpenRouter `mongodb/voyage-code-4`. Each string is `title: <header> | text: <content>`. Each call sends one text. The 10 calls run at the same time.
    - Upsert those vectors into Vectorize. The namespace is the index id.
    - Record the stored chunk count on the index row. The status card shows that count on its next poll.
 3. Repeat until the object is done. The next object starts only after that.
@@ -260,7 +260,7 @@ D1 stops at 10 GB for one database. The 30-day cleanup keeps the chunk text unde
 - The vector id is the chunk id, `<indexId>:<chunkSeq>`. Vectorize limits an id to 64 bytes.
 - The metadata holds `path`, `language`, and `kind`. Create the metadata indexes before the first insert.
 - Vectorize indexes only the first 64 bytes of a metadata value. A path filter longer than that becomes a filter after the query.
-- The dimension of an index is fixed. `repotron-staging-chunks` is 768 today. `mongodb/voyage-code-4` needs 1024. Step 1 of [retrieval-improvement-plan.md](retrieval-improvement-plan.md) clears the database, deletes that index, and creates it again. The code pull request comes after that.
+- The dimension of an index is fixed. `repotron-staging-chunks` is 1024. `mongodb/voyage-code-4` writes 1024 numbers.
 - An upsert is asynchronous. A vector is searchable only after Vectorize processes the mutation.
 
 **R2** holds the chunk batches of an index job, and the eval reports from Phase 4. The Workflow deletes the batches after the `ready` step or after a failure.
@@ -269,11 +269,11 @@ D1 stops at 10 GB for one database. The 30-day cleanup keeps the chunk text unde
 
 AI Gateway fronts each model call. It records the model id, the tokens, and the latency for the `answered_questions` row.
 
-- **Embeddings.** The live index uses Workers AI `@cf/google/embeddinggemma-2`. It is a general text model. It gives 768 dimensions and has an 8,192-token context window. The re-index deletes `repotron-staging-chunks` and creates it again at 1024 dimensions. The re-index model is `mongodb/voyage-code-4`. The model facts are in [retrieval-improvement-plan.md](retrieval-improvement-plan.md).
+- **Embeddings.** The model is OpenRouter `mongodb/voyage-code-4`. It gives 1024 dimensions. The context window is 32,000 tokens. The model facts are in [retrieval-improvement-plan.md](retrieval-improvement-plan.md).
   - The model id is the constant `EMBEDDING_MODEL_ID` in `packages/domain`, not a Worker var. The gateway and the pipeline must use the same model, and the Vectorize dimension depends on it.
-  - The model expects task prefixes. A question becomes `task: search result | query: <question>`. A chunk uses the `title` and `text` form in the chunk rules.
-  - One request allows 8,192 tokens. That limit is the sum of every text in the request. `EMBED_BATCH_SIZE` is 1, so one chunk at the 1,500-token cap stays under that limit. `EMBED_CONCURRENCY` is 10, so ten calls run at the same time.
-  - The re-index calls `mongodb/voyage-code-4` on OpenRouter.
+  - A question uses `input_type` `query`. A chunk uses `input_type` `document` and the `title` and `text` form in the chunk rules.
+  - One request embeds one chunk. `EMBED_BATCH_SIZE` is 1. `EMBED_CONCURRENCY` is 10, so ten calls run at the same time.
+  - The pipeline calls `mongodb/voyage-code-4` on OpenRouter. `OPENROUTER_API_KEY` and `CF_AIG_TOKEN` are pipeline secrets.
 - **Reranker.** The reranker is OpenRouter `mongodb/rerank-3`. The model facts are in [retrieval-improvement-plan.md](retrieval-improvement-plan.md).
 - **Answer model.** OpenRouter model `anthropic/claude-haiku-5.5`, through the AI Gateway OpenRouter route. Stream the tokens. Temperature 0. The Worker var is `ANSWER_MODEL_ID`. The gateway calls it with `fetch`, with no SDK.
   - Set `reasoning.effort` to `none`. Thinking is on by default. Thinking tokens delay the first answer token and add to the output bill.
@@ -374,7 +374,7 @@ The trace calls no model, so it costs no tokens.
 - **Abuse.** Turnstile and the `RateLimiter` Durable Object guard the gateway. The size limits guard the container.
 - **CORS.** The gateway allows only the web origin. CORS does not stop a script outside a browser, so Turnstile and the rate limits stay the real guard.
 - **Index scope.** The index id comes from the route. Each Vectorize query sets the namespace. Each D1 chunk query filters on the index id. Each FTS5 query starts with the index id.
-- **Secrets.** `TURNSTILE_SECRET`, `GITHUB_TOKEN`, `OPENROUTER_API_KEY`, `CF_AIG_TOKEN`, and `EVAL_TOKEN` are gateway secrets. The answer request sends `CF_AIG_TOKEN` in `cf-aig-authorization`. `GITHUB_TOKEN`, `R2_ACCESS_KEY_ID`, and `R2_SECRET_ACCESS_KEY` are pipeline secrets. The pipeline passes its three secrets to the container as environment variables. The web Worker has no secret.
+- **Secrets.** `TURNSTILE_SECRET`, `GITHUB_TOKEN`, `OPENROUTER_API_KEY`, `CF_AIG_TOKEN`, and `EVAL_TOKEN` are gateway secrets. The answer request sends `CF_AIG_TOKEN` in `cf-aig-authorization`. `GITHUB_TOKEN`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `OPENROUTER_API_KEY`, and `CF_AIG_TOKEN` are pipeline secrets. The pipeline passes `GITHUB_TOKEN` and the two R2 keys to the container. The web Worker has no secret.
 
 ---
 

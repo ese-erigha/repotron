@@ -24,14 +24,6 @@ export type BatchBucket = {
   delete(keys: string[]): Promise<void>
 }
 
-export type AiBinding = {
-  run(
-    model: string,
-    input: { input: string[] },
-    options: { gateway: { id: string } },
-  ): Promise<{ data?: { embedding?: number[] }[] }>
-}
-
 export type WorkflowStart = { id: string; params: { indexId: string } }
 
 export type WorkflowClient = {

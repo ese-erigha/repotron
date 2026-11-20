@@ -18,7 +18,7 @@ Precision is the weak number. About 1 chunk in 8 overlaps the expected lines. Re
 
 ## Models
 
-The live index uses `@cf/google/embeddinggemma-2`. That model is a general text model. The re-index deletes `repotron-staging-chunks` and creates it again at 1024 dimensions. The name stays. The vectors do not. A purge of the old vectors is not enough, because a 768-dimension index cannot store a 1024-number vector.
+The index `repotron-staging-chunks` has 1024 dimensions. The embedding model is `mongodb/voyage-code-4` on OpenRouter. A 768-dimension index cannot store a 1024-number vector, so the old index was replaced.
 
 The re-index model is `mongodb/voyage-code-4` on OpenRouter, at 1024 dimensions. The price is $0.12 per million tokens. The context window is 32,000 tokens. The answer model already uses that account.
 
@@ -40,7 +40,7 @@ Step 1 is a staging change, not a pull request. Step 2 is one pull request, and 
    - Delete the Vectorize index `repotron-staging-chunks`.
    - Create `repotron-staging-chunks` again with 1024 dimensions and cosine distance.
    - Create the string metadata indexes on `path`, `language`, and `kind` before the first insert.
-   - Do not index a repository until step 2 is on `develop`. The live Workers still write 768-number vectors until that merge.
+   - This step is done. The index is 1024 dimensions.
 2. Switch the code to the new index. One pull request.
    - Set `EMBEDDING_MODEL_ID` to `mongodb/voyage-code-4`.
    - Set the vector dimension to 1024.

@@ -1,5 +1,7 @@
 import {
   CONTEXT_CHUNKS,
+  EMBEDDING_DIMENSIONS,
+  EMBEDDING_INPUT,
   EMBEDDING_MODEL_ID,
   formatQueryInput,
   keywordMatch,
@@ -11,7 +13,7 @@ import {
 } from 'repotron-domain'
 import type { SourceChunkRecord } from 'db'
 
-import { getAi, getConfig, getRepositories, getVectors } from '../../context.ts'
+import { getConfig, getRepositories, getVectors } from '../../context.ts'
 
 export type SearchInput = {
   indexId: string
@@ -49,13 +51,7 @@ async function vectorIds(
   topK: number,
   filter: ReturnType<typeof metadataFilter>,
 ): Promise<string[]> {
-  const embedded = await getAi().run(
-    EMBEDDING_MODEL_ID,
-    { input: [formatQueryInput(question)] },
-    { gateway: { id: getConfig().AI_GATEWAY_ID } },
-  )
-  const vector = embedded.data?.[0]?.embedding
-  if (!vector) throw new Error(`The question embedding is missing. The model returned ${embedded.data?.length ?? 0} rows.`)
+  const vector = await embedQuestion(formatQueryInput(question))
   const result = await getVectors().query(vector, {
     topK,
     namespace: indexId,
@@ -64,6 +60,41 @@ async function vectorIds(
     ...(filter ? { filter } : {}),
   })
   return (result.matches ?? []).map((match) => match.id)
+}
+
+type EmbeddingResponse = {
+  data?: { embedding?: number[]; index?: number }[]
+}
+
+async function embedQuestion(question: string): Promise<number[]> {
+  const config = getConfig()
+  const payload = {
+    model: EMBEDDING_MODEL_ID,
+    input: [question],
+    dimensions: EMBEDDING_DIMENSIONS,
+    input_type: EMBEDDING_INPUT.query,
+  }
+  const response = await fetch(embeddingUrl(config.CLOUDFLARE_ACCOUNT_ID, config.AI_GATEWAY_ID), {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${config.OPENROUTER_API_KEY}`,
+      'cf-aig-authorization': `Bearer ${config.CF_AIG_TOKEN}`,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  })
+  if (!response.ok) {
+    const detail = await response.text()
+    throw new Error(`The embedding model failed with status ${response.status}. ${detail}`)
+  }
+  const body = (await response.json()) as EmbeddingResponse
+  const vector = body.data?.[0]?.embedding
+  if (!vector) throw new Error('The question embedding is missing.')
+  return vector
+}
+
+function embeddingUrl(accountId: string, gatewayId: string): string {
+  return `https://gateway.ai.cloudflare.com/v1/${accountId}/${gatewayId}/openrouter/embeddings`
 }
 
 async function keywordIds(input: SearchInput): Promise<string[]> {
