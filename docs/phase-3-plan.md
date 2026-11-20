@@ -218,7 +218,7 @@ The production path stays dense.
 
 ### Stage 5: Measure the reranker
 
-**Status.** Twenty golden pairs were scored with `@cf/baai/bge-reranker-base`. The low score is 0.0004465289821382612. The high score is 0.9927901029586792. Every score is between 0 and 1, so the gateway does not apply a sigmoid. The production path stays the semantic top 8.
+**Status.** Twenty golden pairs were scored with `@cf/baai/bge-reranker-base`, then again with OpenRouter `mongodb/rerank-3`. Both runs stay between 0 and 1, so the gateway does not apply a sigmoid. On the rerank-3 run, every definition scores below the readme for "What is Flask?". The production path stays semantic search plus the extra keyword chunk.
 
 - Call `bge-reranker-base` on 20 golden pairs.
 - Write `apps/evals/reranker-scores.md` with the low score, the high score, and the sigmoid decision.
@@ -227,7 +227,7 @@ The production path stays dense.
 
 ### Stage 6: Turn on rerank and the labels
 
-**Status.** Priority. This is steps 5 and 6 of [retrieval-improvement-plan.md](retrieval-improvement-plan.md). The model is `mongodb/rerank-3`. The sort stays off until a definition scores above a readme. The production path stays semantic search plus the symbol move until that check passes.
+**Status.** The rerank-3 check failed. A definition still scores below the readme for "What is Flask?". The sort stays off. The production path stays semantic search plus the extra keyword chunk.
 
 - Rerank the top 50 fused chunks. Keep 8.
 - Attach high, medium, or low to each citation in the retrieval event and in the saved citation JSON.

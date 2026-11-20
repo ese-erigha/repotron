@@ -6,9 +6,9 @@ Hybrid search and the reranker are the work. Scope filters and the symbol trace 
 
 ## Where we are
 
-The current stage is hybrid search. The chunk-text re-index is done. Recall stayed 0.6667. `identifierHitAt1` rose to 1.0. Do not write another chunk-text wrapper.
+Hybrid search is merged. Recall stayed at 0.6667. `identifierHitAt1` stayed at 1.0. Do not write another chunk-text wrapper.
 
-This pull request keeps the 8 semantic chunks and the symbol move. It adds the first keyword chunk at the end when that chunk is not already in the 8.
+`mongodb/rerank-3` scored the same 20 pairs. Every score is between 0 and 1. Every definition scores below the readme for "What is Flask?". The sort stays off.
 
 ## The floor we keep
 
@@ -29,7 +29,7 @@ The index `repotron-staging-chunks` has 1024 dimensions and cosine distance. The
 
 The embedding text is the header, then the first docstring when the chunk has one, then the content. A signature is added only when the content does not already start with it. The old `title:` and `text:` wrapper is gone. Vectors written before that change do not count.
 
-The reranker is `mongodb/rerank-3` on OpenRouter. The price is $0.05 per million tokens. OpenRouter lists a p50 latency of 0.17 s. It is not on yet.
+The reranker is `mongodb/rerank-3` on OpenRouter. The price is $0.05 per million tokens. OpenRouter lists a p50 latency of 0.17 s. The 20-pair measurement is recorded. The sort stays off.
 
 ## Done
 
@@ -41,20 +41,20 @@ The reranker is `mongodb/rerank-3` on OpenRouter. The price is $0.05 per million
 
 ## Next
 
-This pull request is hybrid search. The eval on this pull request asks the 30 questions. Merge only when recall stays at 0.6667 and `identifierHitAt1` stays at 1.0. If recall drops, revert this step. Do not swap a keyword chunk into one of the original 8 slots.
+Stop the rerank sort. A definition still scores below the readme for "What is Flask?". Do not start the sort step.
 
 ## Later steps
 
 One step is one pull request. Stop when the check fails. Do not hide a failure by starting the next step.
 
-1. Hybrid search. This is the current pull request. Give the model the 8 semantic chunks plus one keyword chunk. Do not reorder the 8, and do not delete one of them.
+1. Hybrid search is merged. Give the model the 8 semantic chunks plus one keyword chunk. Do not reorder the 8, and do not delete one of them.
    - Run semantic search for the top 8, then the symbol move. A "where is" question still puts the named function first.
    - Run keyword search for the top 50.
    - If the first keyword chunk is already inside the 8, stop. The model receives those 8.
    - If it is not inside the 8, add it at the end. The model receives 9 chunks.
    - Run the 30 questions. Merge only when recall and `identifierHitAt1` stay at the floor from the chunk-text run.
    - If recall drops, stop this step. Do not put the keyword chunk into one of the original 8 slots. That swap already failed.
-2. Reranker scores. Score the 20 pairs with `mongodb/rerank-3`. Do not change the order of chunks a user receives.
+2. Reranker scores are recorded. The check failed. Do not change the order of chunks a user receives.
    - Use the same 20 questions and the ground-truth chunks from the index we keep.
    - Call `mongodb/rerank-3`. The passage is the header, then the content. The query text is the user question.
    - Write the low score, the high score, and the sigmoid decision in `apps/evals/reranker-scores.md`.
