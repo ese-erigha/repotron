@@ -6,9 +6,9 @@ Hybrid search and the reranker are the work. Scope filters and the symbol trace 
 
 ## Where we are
 
-Hybrid search is merged. Recall stayed at 0.6667. `identifierHitAt1` stayed at 1.0. Do not write another chunk-text wrapper.
+The four-way comparison is in `apps/evals/ablation.json`. Keyword search alone has recall 0.5556 and a first-chunk hit of 0. Meaning search alone has recall 0.6667 and a first-chunk hit of 0.6667. That path does not move the named function.
 
-`mongodb/rerank-3` scored each definition question against the readme in one call. The function scored higher every time. The retrieved chunks are sorted by that score. A "where is" question still keeps the named function first.
+The keyword chunk plus the symbol move reaches a first-chunk hit of 1.0. The rerank keeps that hit and the same recall. It does not find more code. Citation accuracy rises from 0.1488 to 0.1538. The production path stays the reranked list.
 
 ## The floor we keep
 
@@ -41,7 +41,7 @@ The reranker is `mongodb/rerank-3` on OpenRouter. The price is $0.05 per million
 
 ## Next
 
-This pull request sorts the retrieved chunks. Merge only when recall stays at 0.6667 and `identifierHitAt1` stays at 1.0.
+The comparison is recorded. The production path stays the reranked list. Do not change it from this file.
 
 ## Later steps
 
@@ -60,7 +60,7 @@ One step is one pull request. Stop when the check fails. Do not hide a failure b
    - The cross-question scores stay in `apps/evals/reranker-scores.md`. They compare different questions, so they do not decide the sort.
    - The same-question check passed. The function scored above the readme when both chunks were in one call.
 3. Sort the retrieved chunks with `mongodb/rerank-3`. This is the current pull request. On a "where is" question, the symbol-matched chunk stays first. Do not sort a top 50 down to 8. Merge only when recall and `identifierHitAt1` stay at the floor from the chunk-text run, and retrieval p95 stays under 800 ms.
-4. Write the comparison. Score keyword search alone, semantic search alone, semantic search plus the extra keyword chunk, and that list after the reranker. Use the 30 questions. Split the scores by question kind. Commit the file as `apps/evals/ablation.json`. Do not change the production path in this pull request.
+4. The comparison is recorded in `apps/evals/ablation.json`. Dense has the highest precision. Hybrid and rerank share recall 0.6667 and a first-chunk hit of 1.0. This file does not change the production path.
 
 ## What this plan refuses
 
