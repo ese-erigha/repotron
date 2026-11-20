@@ -22,4 +22,4 @@ export const INDEX_REQUESTS_PER_HOUR = 5
 export const QUESTIONS_PER_HOUR = 30
 export const STATUS_POLL_MS = 2_000
 export const RATE_LIMIT_WINDOW_MS = 3_600_000
-export const EMBEDDING_DIMENSIONS = 768
+export const EMBEDDING_DIMENSIONS = 1024

@@ -43,7 +43,7 @@ export {
   VECTOR_METADATA_BYTES,
   STATUS_POLL_MS,
 } from './limits.ts'
-export { ANSWER_MODEL_ID, EMBEDDING_MODEL_ID } from './models.ts'
+export { ANSWER_MODEL_ID, EMBEDDING_INPUT, EMBEDDING_MODEL_ID } from './models.ts'
 export {
   ANSWER_RULES,
   NOT_FOUND_ANSWER,

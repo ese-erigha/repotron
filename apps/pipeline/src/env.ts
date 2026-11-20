@@ -2,6 +2,9 @@ import { z } from 'zod'
 
 const pipelineEnvSchema = z.object({
   AI_GATEWAY_ID: z.string().min(1),
+  CLOUDFLARE_ACCOUNT_ID: z.string().min(1),
+  OPENROUTER_API_KEY: z.string().min(1),
+  CF_AIG_TOKEN: z.string().min(1),
   R2_ENDPOINT: z.string().url(),
   R2_BUCKET: z.string().min(1),
   GITHUB_TOKEN: z.string().min(1),
@@ -14,6 +17,9 @@ export type PipelineEnv = z.infer<typeof pipelineEnvSchema>
 export function readPipelineEnv(source: Record<string, unknown>): PipelineEnv {
   const env = {
     AI_GATEWAY_ID: source.AI_GATEWAY_ID,
+    CLOUDFLARE_ACCOUNT_ID: source.CLOUDFLARE_ACCOUNT_ID,
+    OPENROUTER_API_KEY: source.OPENROUTER_API_KEY,
+    CF_AIG_TOKEN: source.CF_AIG_TOKEN,
     R2_ENDPOINT: source.R2_ENDPOINT,
     R2_BUCKET: source.R2_BUCKET,
     GITHUB_TOKEN: source.GITHUB_TOKEN,

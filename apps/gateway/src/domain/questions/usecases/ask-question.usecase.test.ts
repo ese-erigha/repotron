@@ -147,6 +147,7 @@ function context(input: {
   keyword?: { indexId: string; match: string }
   onVectorQuery?: (options: { filter?: { path?: { $gte: string; $lt: string } } }) => void
 }): GatewayContext {
+  globalThis.fetch = (async () => Response.json({ data: [{ embedding: [0.1], index: 0 }] })) as typeof fetch
   return {
     config,
     repositories: {

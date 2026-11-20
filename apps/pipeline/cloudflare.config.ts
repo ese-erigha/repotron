@@ -25,7 +25,6 @@ export default defineConfig({
     env: {
       DB: bindings.d1({ id: 'f78d8026-6c6d-4a12-ba21-713f9b540fec', name: 'repotron-staging-db' }),
       CHUNK_VECTORS: bindings.vectorize({ name: 'repotron-staging-chunks' }),
-      AI: bindings.ai({}),
       CHUNK_BATCHES: bindings.r2({ name: 'repotron-staging-batches' }),
       INDEXER: bindings.durableObject({ worker: 'repotron-staging-pipeline', exportName: 'Indexer' }),
       REPOSITORY_INDEXING: bindings.workflow({
@@ -39,6 +38,7 @@ export default defineConfig({
         exportName: 'IndexDeletion',
       }),
       AI_GATEWAY_ID: bindings.text('repotron-staging-ai-gateway'),
+      CLOUDFLARE_ACCOUNT_ID: bindings.text('ebdd8a56ec566f7624f98652addd5ecf'),
       R2_ENDPOINT: bindings.text('https://ebdd8a56ec566f7624f98652addd5ecf.r2.cloudflarestorage.com'),
       R2_BUCKET: bindings.text('repotron-staging-batches'),
     },
