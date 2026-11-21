@@ -41,7 +41,7 @@ The reranker is `mongodb/rerank-3` on OpenRouter. The price is $0.05 per million
 
 ## Next
 
-This search plan is done. The production path stays the reranked list. Confidence labels are not needed. The next plan is Phase 4, the public dashboard, in [features.md](features.md) and [prd.md](prd.md).
+This search plan is done. The production path stays the reranked list. Confidence labels are not needed. The next plan is [phase-4-plan.md](phase-4-plan.md).
 
 ## Later steps
 

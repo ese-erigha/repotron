@@ -57,6 +57,8 @@ This file lists each feature, its phase, and the check that proves it on staging
 
 ## 5. Phase 4: Public dashboard
 
+[phase-4-plan.md](phase-4-plan.md) holds the delivery stages.
+
 - **F-17: Eval history.** CI stores each eval report in R2, keyed by the Repotron commit.
 - **F-18: Dashboard.** One public chart shows accuracy, p95 latency, and cost per question across commits.
 

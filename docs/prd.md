@@ -255,5 +255,7 @@ These are targets. Measure them on staging.
 
 ### Phase 4: Public dashboard
 
+[phase-4-plan.md](phase-4-plan.md) holds the delivery stages.
+
 - [ ] Store each eval report in R2.
 - [ ] Add the dashboard screen.
