@@ -14,6 +14,7 @@ export default defineConfig({
     env: {
       DB: bindings.d1({ id: 'f78d8026-6c6d-4a12-ba21-713f9b540fec', name: 'repotron-staging-db' }),
       CHUNK_VECTORS: bindings.vectorize({ name: 'repotron-staging-chunks' }),
+      CHUNK_BATCHES: bindings.r2({ name: 'repotron-staging-batches' }),
       REPOSITORY_INDEXING: bindings.workflow({
         name: 'repotron-staging-repository-indexing',
         worker: 'repotron-staging-pipeline',

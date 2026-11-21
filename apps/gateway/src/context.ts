@@ -15,6 +15,17 @@ export type RepositoryIndexingClient = {
   get(id: string): { restart(): Promise<void> }
 }
 
+export type EvalReportList = {
+  objects: { key: string }[]
+  truncated: boolean
+  cursor?: string
+}
+
+export type EvalReportBucket = {
+  list(options: { prefix: string; cursor?: string }): Promise<EvalReportList>
+  get(key: string): Promise<{ json(): Promise<unknown> } | null>
+}
+
 export type VectorIndex = {
   query(
     vector: number[],
@@ -34,6 +45,7 @@ export type GatewayContext = {
   config: GatewayEnv
   repositories: RepotronRepositories
   vectors: VectorIndex
+  evalReports: EvalReportBucket
   repositoryIndexing: RepositoryIndexingClient
   rateLimiter: { getByName(name: string): RateLimiterStub }
   execution: { waitUntil(promise: Promise<unknown>): void }
@@ -46,6 +58,7 @@ export function gatewayContext(source: Record<string, unknown>, execution: Gatew
     config: readGatewayEnv(source),
     repositories: new RepotronRepositories(createDatabase(source.DB as Parameters<typeof createDatabase>[0])),
     vectors: source.CHUNK_VECTORS as VectorIndex,
+    evalReports: source.CHUNK_BATCHES as EvalReportBucket,
     repositoryIndexing: source.REPOSITORY_INDEXING as RepositoryIndexingClient,
     rateLimiter: source.RATE_LIMITER as GatewayContext['rateLimiter'],
     execution,
@@ -62,6 +75,10 @@ export function getRepositories(): RepotronRepositories {
 
 export function getVectors(): VectorIndex {
   return context().vectors
+}
+
+export function getEvalReports(): EvalReportBucket {
+  return context().evalReports
 }
 
 export function getRepositoryIndexing(): RepositoryIndexingClient {

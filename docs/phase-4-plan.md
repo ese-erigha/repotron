@@ -135,7 +135,7 @@ The header links to `/dashboard`. The fixture API returns two summaries, so `pnp
 
 ### Stage 3: Read the history
 
-**Status.** Not started. Start after stage 2.
+**Status.** `GET /api/v1/evals` returns at most 30 summaries, newest first. The fixture returns two summaries. The route calls no model.
 
 - Add `GET /api/v1/evals` on the gateway.
 - Return at most 30 summaries, newest first.

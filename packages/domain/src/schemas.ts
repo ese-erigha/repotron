@@ -70,6 +70,29 @@ export const questionViewSchema = z.object({
 
 export type QuestionView = z.infer<typeof questionViewSchema>
 
+export const evalSummarySchema = z.object({
+  commitSha: z.string().min(1),
+  createdAt: z.number().int(),
+  scores: z.object({
+    recall: z.number(),
+    precision: z.number(),
+    faithfulness: z.number(),
+    answerRelevance: z.number(),
+    citationAccuracy: z.number(),
+    refusalAccuracy: z.number(),
+    identifierHitAt1: z.number(),
+  }),
+  latency: z.object({
+    retrievalP95Ms: z.number().int(),
+    firstTokenP95Ms: z.number().int(),
+  }),
+  cost: z.object({
+    dollars: z.number(),
+  }),
+})
+
+export type EvalSummary = z.infer<typeof evalSummarySchema>
+
 export const retrievalEventSchema = z.object({ citations: z.array(citationSchema) })
 export const tokenEventSchema = z.object({ text: z.string() })
 export const doneEventSchema = z.object({

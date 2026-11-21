@@ -262,7 +262,7 @@ D1 stops at 10 GB for one database. The 30-day cleanup keeps the chunk text unde
 - The dimension of an index is fixed. `repotron-staging-chunks` is 1024. `mongodb/voyage-code-4` writes 1024 numbers.
 - An upsert is asynchronous. A vector is searchable only after Vectorize processes the mutation.
 
-**R2** holds the chunk batches of an index job, and the eval reports from Phase 4. The Workflow deletes the batches after the `ready` step or after a failure.
+**R2** holds the chunk batches of an index job, and the eval reports from Phase 4. The Workflow deletes the batches after the `ready` step or after a failure. The gateway reads the objects under `evals/` for `GET /api/v1/evals` and returns the newest 30.
 
 ### Tier 6: Models
 
