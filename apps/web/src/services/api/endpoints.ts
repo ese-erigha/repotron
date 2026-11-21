@@ -9,3 +9,5 @@ export const INDEX_PATH = {
 export const QUESTION_PATH = {
   byId: (questionId: string) => `${API_BASE}/questions/${encodeURIComponent(questionId)}`,
 } as const
+
+export const EVAL_PATH = `${API_BASE}/evals`

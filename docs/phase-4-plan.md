@@ -145,7 +145,7 @@ The header links to `/dashboard`. The fixture API returns two summaries, so `pnp
 
 ### Stage 4: Draw the dashboard
 
-**Status.** Not started. Start after stage 3.
+**Status.** `/dashboard` draws recall, retrieval speed, and cost. The page lists the six scores for the newest run. The header links to the page.
 
 - Add `/dashboard`.
 - Draw the SVG from Decision C.

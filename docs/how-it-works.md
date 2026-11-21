@@ -61,4 +61,4 @@ These steps are not in the first version.
   - The user can limit a question to a language or a folder.
   - Do not add a confidence label. The file and the lines are already on the citation.
   - A symbol trace lists where a name is defined, then where the code uses it. That trace calls no model.
-- **Phase 4.** A public chart shows accuracy, latency, and cost for each version of Repotron.
+- **Phase 4.** A public chart on `/dashboard` shows accuracy, latency, and cost for each version of Repotron.
