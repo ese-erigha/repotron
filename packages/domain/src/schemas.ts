@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { CHUNK_KIND, ERROR_CODE, INDEX_STATUS, LANGUAGE, PRESET, SYMBOL_HIT_ROLE } from './sets.ts'
+import { CHUNK_KIND, ERROR_CODE, INDEX_STATUS, LANGUAGE, PRESET } from './sets.ts'
 
 const values = <T extends Record<string, string>>(set: T) =>
   Object.values(set) as [T[keyof T], ...T[keyof T][]]
@@ -39,22 +39,6 @@ export const citationSchema = z.object({
 })
 
 export type Citation = z.infer<typeof citationSchema>
-
-export const symbolHitSchema = z.object({
-  role: z.enum(values(SYMBOL_HIT_ROLE)),
-  path: z.string(),
-  startLine: z.number().int().positive(),
-  endLine: z.number().int().positive(),
-  githubUrl: z.string().url(),
-})
-
-export const symbolTraceSchema = z.object({
-  symbol: z.string(),
-  hits: z.array(symbolHitSchema),
-})
-
-export type SymbolHit = z.infer<typeof symbolHitSchema>
-export type SymbolTrace = z.infer<typeof symbolTraceSchema>
 
 export const indexViewSchema = z.object({
   id: z.string(),
