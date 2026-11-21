@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
-import { indexViewSchema } from 'repotron-domain'
+import { evalSummarySchema, indexViewSchema } from 'repotron-domain'
 
 import { answerRequest } from './fixture-routes.ts'
 import { FixtureStore } from './fixture-store.ts'
@@ -28,5 +28,18 @@ describe('fixture routes', () => {
       error: { code: 'not_found', message: 'The index does not exist.' },
     })
     assert.equal(response.status, 404)
+  })
+
+  it('when the eval history is requested, then the fixture returns the two summaries newest first', async () => {
+    const store = new FixtureStore(NOW)
+
+    const response = await answerRequest(store, new Request('http://fixture/evals'))
+
+    const body = (await response.json()) as { evals: { createdAt: number }[] }
+    assert.equal(response.status, 200)
+    assert.equal(body.evals.length, 2)
+    assert.deepEqual(evalSummarySchema.array().parse(body.evals), body.evals)
+    assert.equal(body.evals[0]?.createdAt, 1_700_000_000_100)
+    assert.equal(body.evals[1]?.createdAt, 1_700_000_000_000)
   })
 })

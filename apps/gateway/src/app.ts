@@ -3,6 +3,7 @@ import { cors } from 'hono/cors'
 import { ERROR_CODE } from 'repotron-domain'
 
 import { gatewayContext, gatewayStorage } from './context.ts'
+import evals from './domain/evals/evals.controller.ts'
 import indexes from './domain/indexes/indexes.controller.ts'
 import questions from './domain/questions/questions.controller.ts'
 import { handleErrors, RequestError } from './http-error.ts'
@@ -42,6 +43,7 @@ app.onError((error, c) => handleErrors(c, error))
 app.get('/health', readHealth)
 app.route(`${API_BASE}/indexes`, indexes)
 app.route(`${API_BASE}/questions`, questions)
+app.route(`${API_BASE}/evals`, evals)
 app.all(`${API_BASE}/*`, missingRoute)
 
 function readHealth(c: Context): Response {

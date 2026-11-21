@@ -10,9 +10,10 @@ import {
 
 import { scriptAnswer, type QuestionBody } from './answer-script.ts'
 import { streamAnswer, type AnswerStreamInput } from './answer-stream.ts'
+import { FIXTURE_EVALS } from './data/eval-summaries.ts'
 import { FixtureDisconnect, FixtureRequestError, type FixtureStore } from './fixture-store.ts'
 import { FIXTURE_DELAY_MS, FIXTURE_ERROR, QUESTION_SCENARIO } from './scenarios.ts'
-import { failureResponse, indexResponse, indexesResponse, questionResponse } from './send-response.ts'
+import { failureResponse, evalsResponse, indexResponse, indexesResponse, questionResponse } from './send-response.ts'
 
 /** The routes of the gateway under `/api/v1`. The caller strips that prefix. */
 const ROUTE = {
@@ -21,6 +22,7 @@ const ROUTE = {
   readIndex: 'GET /indexes/:id',
   askQuestion: 'POST /indexes/:id/questions',
   readQuestion: 'GET /questions/:id',
+  listEvalSummaries: 'GET /evals',
 } as const
 
 const ID_SEGMENT = ':id'
@@ -50,6 +52,8 @@ async function routeRequest(store: FixtureStore, request: Request): Promise<Resp
       return askQuestion(store, route.id, request)
     case ROUTE.readQuestion:
       return readQuestion(store, route.id)
+    case ROUTE.listEvalSummaries:
+      return listEvalSummaries()
     default:
       throw new FixtureRequestError(FIXTURE_ERROR.missingRoute)
   }
@@ -92,6 +96,11 @@ async function readQuestion(store: FixtureStore, questionId: string): Promise<Re
   const question = store.getQuestion(questionId)
   if (!question) throw new FixtureRequestError(FIXTURE_ERROR.missingAnswer)
   return questionResponse(question)
+}
+
+async function listEvalSummaries(): Promise<Response> {
+  await wait(FIXTURE_DELAY_MS.read)
+  return evalsResponse(FIXTURE_EVALS)
 }
 
 async function askQuestion(store: FixtureStore, indexId: string, request: Request): Promise<Response> {

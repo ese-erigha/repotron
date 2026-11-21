@@ -3,10 +3,12 @@ import {
   errorCodeSchema,
   errorEventSchema,
   indexViewSchema,
+  evalSummarySchema,
   questionViewSchema,
   retrievalEventSchema,
   STREAM_EVENT,
   tokenEventSchema,
+  type EvalSummary,
   type IndexView,
   type QuestionView,
   type StreamEventName,
@@ -30,6 +32,12 @@ export function indexResponse(status: number, index: IndexView): Response {
 export function indexesResponse(indexes: IndexView[]): Response {
   const views = indexes.map((index) => indexViewSchema.parse(index))
   return jsonResponse(200, { indexes: views })
+}
+
+/** The eval history. The schema is the body of `GET /evals`. */
+export function evalsResponse(evals: EvalSummary[]): Response {
+  const summaries = evals.map((item) => evalSummarySchema.parse(item))
+  return jsonResponse(200, { evals: summaries })
 }
 
 /** One stored answer. The schema is the body of `GET /questions/:id`. */

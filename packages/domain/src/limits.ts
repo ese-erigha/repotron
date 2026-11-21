@@ -15,6 +15,7 @@ export const START_HERE_MAX_PATHS = 500
 export const QUESTION_MAX_CHARS = 1_000
 export const FEATURE_NAME_MAX_CHARS = 100
 export const RECENT_INDEX_COUNT = 10
+export const EVAL_HISTORY_COUNT = 30
 export const INDEX_RETENTION_DAYS = 30
 export const INDEX_REQUESTS_PER_HOUR = 5
 export const QUESTIONS_PER_HOUR = 30
