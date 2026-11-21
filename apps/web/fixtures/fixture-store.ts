@@ -4,10 +4,13 @@ import {
   INDEX_STATUS,
   readCitedNumbers,
   RECENT_INDEX_COUNT,
+  RETRIEVAL_TOP_K,
+  SYMBOL_HIT_ROLE,
   type Citation,
   type IndexView,
   type QuestionView,
   type RepositoryLink,
+  type SymbolTrace,
 } from 'repotron-domain'
 
 import { scriptAnswer, type ScriptedAnswer } from './answer-script.ts'
@@ -15,7 +18,7 @@ import type { FixtureRepository } from './data/fixture-repository.ts'
 import { buildGenericRepository, hashOf } from './data/generic.fixture.ts'
 import { SEED_INDEXES, SEED_QUESTIONS, type SeedQuestion } from './data/seed-repositories.ts'
 import { INDEX_TIMELINE, readyAfterMs, statusAt, type IndexTimeline } from './index-timeline.ts'
-import { LINK_ERROR, LINK_SCENARIO, PARSING_FAILURE_REASON, type FixtureError } from './scenarios.ts'
+import { FIXTURE_ERROR, LINK_ERROR, LINK_SCENARIO, PARSING_FAILURE_REASON, type FixtureError } from './scenarios.ts'
 
 const EARLIER_COMMIT_AGE_MS = 3 * 24 * 3_600_000
 
@@ -159,6 +162,32 @@ export class FixtureStore {
     this.questions.set(view.id, view)
   }
 
+  traceSymbol(indexId: string, name: string, now: number): SymbolTrace {
+    const index = this.getIndex(indexId)
+    if (!index) throw new FixtureRequestError(FIXTURE_ERROR.missingIndex)
+    if (this.viewOf(index, now).status !== INDEX_STATUS.ready) {
+      throw new FixtureRequestError(FIXTURE_ERROR.indexNotReady)
+    }
+    const matches = Object.values(index.repository.chunks).filter((chunk) => chunkUsesName(chunk, name))
+    const hits = matches.slice(0, RETRIEVAL_TOP_K).map((chunk) => ({
+      role: chunk.symbol === name ? SYMBOL_HIT_ROLE.definition : SYMBOL_HIT_ROLE.usage,
+      path: chunk.path,
+      startLine: chunk.startLine,
+      endLine: chunk.endLine,
+      githubUrl: buildGithubLineUrl({
+        owner: index.repository.owner,
+        name: index.repository.name,
+        commitSha: index.commitSha,
+        path: chunk.path,
+        startLine: chunk.startLine,
+        endLine: chunk.endLine,
+      }),
+    }))
+    const definitions = hits.filter((hit) => hit.role === SYMBOL_HIT_ROLE.definition)
+    const usages = hits.filter((hit) => hit.role === SYMBOL_HIT_ROLE.usage)
+    return { symbol: name, hits: [...definitions, ...usages] }
+  }
+
   private addIndex(
     repository: FixtureRepository,
     commitSha: string,
@@ -218,6 +247,11 @@ export class FixtureStore {
 
 function fullNameOf(repository: FixtureRepository): string {
   return `${repository.owner}/${repository.name}`.toLowerCase()
+}
+
+function chunkUsesName(chunk: { symbol: string | null; content: string }, name: string): boolean {
+  if (chunk.symbol === name) return true
+  return chunk.content.includes(name)
 }
 
 function chunkCountAt(index: StoredIndex, status: ReturnType<typeof statusAt>, elapsedMs: number): number | null {

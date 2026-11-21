@@ -245,7 +245,7 @@ The production path stays dense.
 
 ### Stage 8: Add the symbol trace
 
-**Status.** Not the priority. Hybrid search and the reranker come first.
+**Status.** The ask screen can trace one name. The route lists the definition first, then the usages. It calls no model. The question rate limit applies.
 
 - Add `GET /api/v1/indexes/:id/symbols/:name`.
 - Add the trace box on the ask screen.
