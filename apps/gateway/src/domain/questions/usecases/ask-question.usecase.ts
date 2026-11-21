@@ -9,7 +9,6 @@ import {
   RETRIEVAL_MODE,
   RETRIEVAL_TOP_K,
   START_HERE_MAX_PATHS,
-  type SearchScope,
 } from 'repotron-domain'
 
 import type { QuestionBody } from '../questions.schema.ts'
@@ -70,24 +69,17 @@ async function retrieveQuestionChunks(
   indexId: string,
   question: string,
 ): Promise<SourceChunkRecord[]> {
-  const scope = questionScope(input.body)
-  if (!isEvalToken(input.evalToken)) return retrieveAnswerChunks(indexId, question, scope)
+  if (!isEvalToken(input.evalToken)) return retrieveAnswerChunks(indexId, question)
   if (input.retrieval === RETRIEVAL_MODE.dense) {
-    const search: SearchInput = { indexId, question, limit: CONTEXT_CHUNKS, scope }
+    const search: SearchInput = { indexId, question, limit: CONTEXT_CHUNKS }
     return semanticSearch(search)
   }
   if (input.retrieval === RETRIEVAL_MODE.bm25) {
-    const search: SearchInput = { indexId, question, limit: RETRIEVAL_TOP_K, scope }
+    const search: SearchInput = { indexId, question, limit: RETRIEVAL_TOP_K }
     return keywordSearch(search)
   }
-  if (input.retrieval === RETRIEVAL_MODE.hybrid) return retrieveHybridChunks(indexId, question, scope)
-  return retrieveAnswerChunks(indexId, question, scope)
-}
-
-function questionScope(body: QuestionBody): SearchScope | undefined {
-  if (!('question' in body)) return undefined
-  if (!body.language && !body.pathPrefix) return undefined
-  return { language: body.language, pathPrefix: body.pathPrefix }
+  if (input.retrieval === RETRIEVAL_MODE.hybrid) return retrieveHybridChunks(indexId, question)
+  return retrieveAnswerChunks(indexId, question)
 }
 
 function questionText(body: QuestionBody): string {

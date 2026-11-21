@@ -87,30 +87,6 @@ describe('askQuestion', () => {
     assert.equal(vectorQueries, 1)
   })
 
-  it('when the question names a path prefix, then the vector query filters that prefix', async () => {
-    let filter: { path?: { $gte: string; $lt: string } } | undefined
-    const stream = await gatewayStorage.run(
-      context({
-        calls: { n: 0 },
-        allowed: true,
-        onVectorQuery: (options) => {
-          filter = options.filter
-        },
-      }),
-      () =>
-        askQuestion({
-          indexId: '9-abc',
-          body: { question: 'Where is the route defined?', pathPrefix: 'src/flask/' },
-          remoteIp: '203.0.113.5',
-          evalToken: '',
-          retrieval: '',
-        }),
-    )
-    await new Response(stream).text()
-
-    assert.deepEqual(filter, { path: { $gte: 'src/flask/', $lt: 'src/flask0' } })
-  })
-
   it('when the eval token matches and retrieval is bm25, then the keyword query binds the index id', async () => {
     const keyword = { indexId: '', match: '' }
     let vectorQueries = 0
@@ -172,7 +148,7 @@ function context(input: {
   calls: { n: number }
   allowed: boolean
   keyword?: { indexId: string; match: string }
-  onVectorQuery?: (options: { filter?: { path?: { $gte: string; $lt: string } } }) => void
+  onVectorQuery?: () => void
 }): GatewayContext {
   globalThis.fetch = (async () => Response.json({ data: [{ embedding: [0.1], index: 0 }] })) as typeof fetch
   return {
@@ -196,8 +172,8 @@ function context(input: {
       answeredQuestions: { insert: async () => undefined },
     },
     vectors: {
-      query: async (_vector: number[], options: { filter?: { path?: { $gte: string; $lt: string } } }) => {
-        input.onVectorQuery?.(options)
+      query: async () => {
+        input.onVectorQuery?.()
         return { matches: [] }
       },
     },
