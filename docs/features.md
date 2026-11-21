@@ -52,7 +52,7 @@ This file lists each feature, its phase, and the check that proves it on staging
 - **F-14: Rerank.** A cross-encoder scores the top 50 fused chunks. The top 8 go to the model.
 - **F-15: Scope filters.** The user limits a question to a language or a path prefix.
 - **F-16: Ablation report.** One report compares dense, BM25, hybrid, and hybrid with rerank on the golden set. It also compares the embedding and reranker candidates.
-- **F-21: Confidence label.** Each citation shows high, medium, or low from its reranker score.
+- **F-21: Confidence label.** Not needed. The rerank order and the file lines already show which source to read. Do not add high, medium, or low.
 - **F-22: Symbol trace.** The user types a symbol name. The result lists its definitions, then its usages. A keyword search on the identifiers does the work, with no model call.
 
 ## 5. Phase 4: Public dashboard

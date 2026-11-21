@@ -312,7 +312,7 @@ Python 3.12, managed with uv. CI runs it against the staging gateway. Phase 2 de
    1. Embed the question. Query Vectorize with `topK` 8. An optional language or path prefix filters that query. A path prefix longer than 64 bytes is applied to the loaded rows.
    2. When the question starts with "where is", move the chunk whose symbol equals the last name to position 1. A keyword chunk does not replace a semantic chunk.
    3. A later stage sends candidates to the reranker and keeps the top 8.
-   4. Give each kept chunk a confidence label from its reranker score. Refer to the confidence rules below.
+   4. Do not add a confidence label. The citation already shows the file and the lines.
 4. Load the chunk rows from D1 and send the `retrieval` event.
 5. Build the prompt from the answer contract in the PRD.
    - For "Where do I start?", also load the distinct paths of the index from `source_chunks`, up to `START_HERE_MAX_PATHS`.
@@ -321,7 +321,7 @@ Python 3.12, managed with uv. CI runs it against the staging gateway. Phase 2 de
 
 Vectorize returns 50 results at most when a query asks for metadata. That limit sets the top 50 of the hybrid path.
 
-**Confidence rules.**
+**Confidence rules.** The product does not show a confidence label. The measured scores sit close together.
 
 - The label uses a score from 0 to 1.
 - The Workers AI output schema for `bge-reranker-base` documents `score` as a number with no range. The model page says a sigmoid maps the score to the range 0 to 1. Neither page states whether Workers AI applies that sigmoid.
