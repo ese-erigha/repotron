@@ -1,10 +1,11 @@
 import { Hono } from 'hono'
 
 import { parseRequest } from '../../http-error.ts'
-import { requestIndexSchema } from './indexes.schema.ts'
+import { requestIndexSchema, symbolNameSchema } from './indexes.schema.ts'
 import { listRecentIndexes } from './usecases/list-recent-indexes.usecase.ts'
 import { readIndex } from './usecases/read-index.usecase.ts'
 import { requestIndex } from './usecases/request-index.usecase.ts'
+import { traceSymbol } from './usecases/trace-symbol.usecase.ts'
 import { questionBodySchema } from '../questions/questions.schema.ts'
 import { askQuestion } from '../questions/usecases/ask-question.usecase.ts'
 
@@ -30,6 +31,16 @@ indexes.get('/', async (c) => {
 indexes.get('/:id', async (c) => {
   const index = await readIndex(c.req.param('id'))
   return c.json(index)
+})
+
+indexes.get('/:id/symbols/:name', async (c) => {
+  const params = parseRequest(symbolNameSchema, { name: c.req.param('name') })
+  const trace = await traceSymbol({
+    indexId: c.req.param('id'),
+    name: params.name,
+    remoteIp: c.req.header('CF-Connecting-IP') ?? '',
+  })
+  return c.json(trace)
 })
 
 indexes.post('/:id/questions', async (c) => {

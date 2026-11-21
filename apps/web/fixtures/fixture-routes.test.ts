@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
-import { indexViewSchema } from 'repotron-domain'
+import { buildIndexId, indexViewSchema, SYMBOL_HIT_ROLE } from 'repotron-domain'
 
 import { answerRequest } from './fixture-routes.ts'
 import { FixtureStore } from './fixture-store.ts'
@@ -28,5 +28,16 @@ describe('fixture routes', () => {
       error: { code: 'not_found', message: 'The index does not exist.' },
     })
     assert.equal(response.status, 404)
+  })
+
+  it('when a symbol is traced, then the definition comes before a usage', async () => {
+    const store = new FixtureStore(NOW)
+    const indexId = buildIndexId('438384984', 'f6fbaf0299c48eea9e656e03e2ffe7ac755e8823')
+
+    const response = await answerRequest(store, new Request(`http://fixture/indexes/${indexId}/symbols/Hono`))
+    const body = (await response.json()) as { hits: { role: string }[] }
+
+    assert.equal(response.status, 200)
+    assert.equal(body.hits[0]?.role, SYMBOL_HIT_ROLE.definition)
   })
 })

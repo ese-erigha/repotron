@@ -4,11 +4,13 @@ import {
   errorEventSchema,
   indexViewSchema,
   questionViewSchema,
+  symbolTraceSchema,
   retrievalEventSchema,
   STREAM_EVENT,
   tokenEventSchema,
   type IndexView,
   type QuestionView,
+  type SymbolTrace,
   type StreamEventName,
 } from 'repotron-domain'
 
@@ -35,6 +37,10 @@ export function indexesResponse(indexes: IndexView[]): Response {
 /** One stored answer. The schema is the body of `GET /questions/:id`. */
 export function questionResponse(question: QuestionView): Response {
   return jsonResponse(200, questionViewSchema.parse(question))
+}
+
+export function symbolTraceResponse(trace: SymbolTrace): Response {
+  return jsonResponse(200, symbolTraceSchema.parse(trace))
 }
 
 /** The error envelope of the gateway: `{ error: { code, message } }`. */

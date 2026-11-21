@@ -12,20 +12,21 @@ import { scriptAnswer, type QuestionBody } from './answer-script.ts'
 import { streamAnswer, type AnswerStreamInput } from './answer-stream.ts'
 import { FixtureDisconnect, FixtureRequestError, type FixtureStore } from './fixture-store.ts'
 import { FIXTURE_DELAY_MS, FIXTURE_ERROR, QUESTION_SCENARIO } from './scenarios.ts'
-import { failureResponse, indexResponse, indexesResponse, questionResponse } from './send-response.ts'
+import { failureResponse, indexResponse, indexesResponse, questionResponse, symbolTraceResponse } from './send-response.ts'
 
 /** The routes of the gateway under `/api/v1`. The caller strips that prefix. */
 const ROUTE = {
   listRecentIndexes: 'GET /indexes',
   requestIndex: 'POST /indexes',
   readIndex: 'GET /indexes/:id',
+  traceSymbol: 'GET /indexes/:id/symbols/:name',
   askQuestion: 'POST /indexes/:id/questions',
   readQuestion: 'GET /questions/:id',
 } as const
 
 const ID_SEGMENT = ':id'
 
-type MatchedRoute = { name: string; id: string }
+type MatchedRoute = { name: string; id: string; symbol: string }
 
 /** Answers one API request from the fixture store. The body matches the gateway schema. */
 export async function answerRequest(store: FixtureStore, request: Request): Promise<Response> {
@@ -46,6 +47,8 @@ async function routeRequest(store: FixtureStore, request: Request): Promise<Resp
       return requestIndex(store, request)
     case ROUTE.readIndex:
       return readIndex(store, route.id)
+    case ROUTE.traceSymbol:
+      return traceSymbol(store, route.id, route.symbol)
     case ROUTE.askQuestion:
       return askQuestion(store, route.id, request)
     case ROUTE.readQuestion:
@@ -58,9 +61,13 @@ async function routeRequest(store: FixtureStore, request: Request): Promise<Resp
 /** Names the route of a request. The second path segment is the id. */
 function matchRoute(request: Request): MatchedRoute {
   const path = new URL(request.url).pathname
-  const [resource = '', id = '', ...rest] = path.split('/').filter((segment) => segment !== '')
+  const [resource = '', id = '', action = '', symbol = ''] = path.split('/').filter((segment) => segment !== '')
+  if (resource === 'indexes' && action === 'symbols') {
+    return { name: ROUTE.traceSymbol, id, symbol }
+  }
+  const rest = action === '' ? [] : [action, ...(symbol === '' ? [] : [symbol])]
   const segments = id === '' ? [resource] : [resource, ID_SEGMENT, ...rest]
-  return { name: `${request.method} /${segments.join('/')}`, id }
+  return { name: `${request.method} /${segments.join('/')}`, id, symbol: '' }
 }
 
 async function listRecentIndexes(store: FixtureStore): Promise<Response> {
@@ -85,6 +92,12 @@ async function readIndex(store: FixtureStore, indexId: string): Promise<Response
   const index = store.getIndex(indexId)
   if (!index) throw new FixtureRequestError(FIXTURE_ERROR.missingIndex)
   return indexResponse(200, store.viewOf(index, Date.now()))
+}
+
+async function traceSymbol(store: FixtureStore, indexId: string, name: string): Promise<Response> {
+  await wait(FIXTURE_DELAY_MS.read)
+  if (name.trim() === '') throw new FixtureRequestError(FIXTURE_ERROR.invalidRequest)
+  return symbolTraceResponse(store.traceSymbol(indexId, name, Date.now()))
 }
 
 async function readQuestion(store: FixtureStore, questionId: string): Promise<Response> {
