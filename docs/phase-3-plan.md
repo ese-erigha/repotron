@@ -225,11 +225,10 @@ The production path stays dense.
 
 ### Stage 6: Turn on rerank and the labels
 
-**Status.** The same-question check passed. A function scores above the readme when both chunks are sent with one question. The production path sorts the retrieved chunks and keeps the named function first on a "where is" question.
+**Status.** The rerank is on. It sorts the retrieved chunks. A "where is" question keeps the named function first. Confidence labels are not needed. The scores sit close together, and each citation already shows the file and the lines. Do not add high, medium, or low.
 
 - Rerank the top 50 fused chunks. Keep 8.
-- Attach high, medium, or low to each citation in the retrieval event and in the saved citation JSON.
-- Show the label on the citation panel and on the share page.
+- Do not add a confidence label.
 - **Staging check:** the required eval check is green. Context precision is higher than the hybrid-only number from stage 4. The printed retrieval p95 is under 800 ms. High citations overlap the ground truth more often than low citations. When one of those three checks fails, do not merge.
 
 ### Stage 7: Add scope filters

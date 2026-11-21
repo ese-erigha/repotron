@@ -249,7 +249,7 @@ These are targets. Measure them on staging.
 - [ ] Add the reranker.
 - [ ] Add the scope filters.
 - [ ] Measure the score range of the reranker. Apply the sigmoid only for a raw score. Refer to the confidence rules in [architecture.md](architecture.md).
-- [ ] Add the confidence label on each citation.
+- [x] Do not add the confidence label. The citation already shows the file and the lines.
 - [ ] Add the symbol trace.
 - [ ] Publish the ablation report.
 
