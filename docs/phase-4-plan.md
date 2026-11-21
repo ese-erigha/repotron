@@ -117,7 +117,7 @@ The header links to `/dashboard`. The fixture API returns two summaries, so `pnp
 
 ### Stage 1: Build the summary
 
-**Status.** Not started.
+**Status.** `build_summary` reads the eval report and returns the summary. The unit test checks recall, both p95 numbers, dollars, and the dropped text. This stage does not call R2.
 
 - Add one function that reads the eval report and returns the summary from Decision A.
 - A unit test proves the summary has recall, both p95 numbers, and dollars.
