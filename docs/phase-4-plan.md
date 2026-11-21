@@ -17,7 +17,7 @@ Phase 3 search work is done. The production path stays the reranked list. This p
 3. [architecture.md](architecture.md) — the route list names `GET /api/v1/evals`. The web section names `/dashboard`.
 4. [features.md](features.md) — F-17 and F-18.
 5. [phase-2-plan.md](phase-2-plan.md) — the eval gate. This phase does not replace it.
-6. This file. Section 3 lists the approved decisions.
+6. This file. Section 3 lists the decisions we follow.
 
 **Ground rules for the implementer:**
 
@@ -72,6 +72,8 @@ A pull request eval still scores the preview gateway. It does not write a public
 ---
 
 ## 3. Decisions
+
+These choices started as recommendations. We follow them. An implementer does not replace one in a stage.
 
 ### Decision A: The public object is a summary
 
