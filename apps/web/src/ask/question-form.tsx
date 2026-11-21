@@ -5,11 +5,9 @@ import { QUESTION_MAX_CHARS } from 'repotron-domain'
 import { Button } from '../ui/button'
 import { cn } from '../ui/cn'
 import { ASK_TEXT, QUESTION_WARNING_SHARE } from './ask.constants'
-import { ScopeFields, scopeFromFields } from './scope-fields'
-import type { QuestionScope } from './ask-request'
 
 type QuestionFormProps = {
-  onSubmit(question: string, scope: QuestionScope): void
+  onSubmit(question: string): void
   /** The preset buttons. They sit in the bottom row of the field. */
   presets: ReactNode
 }
@@ -17,14 +15,12 @@ type QuestionFormProps = {
 export function QuestionForm({ onSubmit, presets }: QuestionFormProps) {
   const inputId = useId()
   const [question, setQuestion] = useState('')
-  const [language, setLanguage] = useState('')
-  const [pathPrefix, setPathPrefix] = useState('')
   const trimmed = question.trim()
   const isNearLimit = question.length >= QUESTION_MAX_CHARS * QUESTION_WARNING_SHARE
 
   function submitQuestion() {
     if (trimmed === '') return
-    onSubmit(trimmed, scopeFromFields(language, pathPrefix))
+    onSubmit(trimmed)
     setQuestion('')
   }
 
@@ -54,12 +50,6 @@ export function QuestionForm({ onSubmit, presets }: QuestionFormProps) {
         onChange={(event) => setQuestion(event.target.value)}
         onKeyDown={submitOnEnter}
         className="thin-scrollbar field-sizing-content max-h-52 min-h-14 w-full resize-none bg-transparent px-3 pt-2.5 text-base leading-relaxed text-ink placeholder:text-faint"
-      />
-      <ScopeFields
-        language={language}
-        pathPrefix={pathPrefix}
-        onLanguage={setLanguage}
-        onPathPrefix={setPathPrefix}
       />
       <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
         {presets}

@@ -54,7 +54,7 @@ export function AskPanel({ answer, onAsk }: AskPanelProps) {
     >
       <div className="space-y-8">
         <QuestionForm
-          onSubmit={(question, scope) => ask(questionRequest(question, scope))}
+          onSubmit={(question) => ask(questionRequest(question))}
           presets={
             <PresetButtons
               onStartHere={() => ask(startHereRequest())}

@@ -5,12 +5,9 @@ import {
   EMBEDDING_MODEL_ID,
   formatQueryInput,
   keywordMatch,
-  matchesScope,
-  metadataFilter,
   promoteSymbolHit,
   RERANK_MODEL_ID,
   RETRIEVAL_TOP_K,
-  type SearchScope,
 } from 'repotron-domain'
 import type { SourceChunkRecord } from 'db'
 
@@ -20,29 +17,21 @@ export type SearchInput = {
   indexId: string
   question: string
   limit: number
-  scope?: SearchScope
 }
 
 export async function semanticSearch(input: SearchInput): Promise<SourceChunkRecord[]> {
-  const topK = input.scope ? RETRIEVAL_TOP_K : input.limit
-  const ids = await vectorIds(input.indexId, input.question, topK, metadataFilter(input.scope))
-  const rows = await rowsInOrder(input.indexId, ids)
-  return rowsInScope(rows, input.scope).slice(0, input.limit)
+  const ids = await vectorIds(input.indexId, input.question, input.limit)
+  return rowsInOrder(input.indexId, ids)
 }
 
 export async function keywordSearch(input: SearchInput): Promise<SourceChunkRecord[]> {
   const ids = await keywordIds(input)
-  const rows = await rowsInOrder(input.indexId, ids)
-  return rowsInScope(rows, input.scope).slice(0, input.limit)
+  return rowsInOrder(input.indexId, ids)
 }
 
-export async function retrieveHybridChunks(
-  indexId: string,
-  question: string,
-  scope?: SearchScope,
-): Promise<SourceChunkRecord[]> {
-  const semantic: SearchInput = { indexId, question, limit: CONTEXT_CHUNKS, scope }
-  const keywords: SearchInput = { indexId, question, limit: RETRIEVAL_TOP_K, scope }
+export async function retrieveHybridChunks(indexId: string, question: string): Promise<SourceChunkRecord[]> {
+  const semantic: SearchInput = { indexId, question, limit: CONTEXT_CHUNKS }
+  const keywords: SearchInput = { indexId, question, limit: RETRIEVAL_TOP_K }
   const [semanticChunks, keywordChunks] = await Promise.all([
     semanticSearch(semantic),
     keywordSearch(keywords),
@@ -51,12 +40,8 @@ export async function retrieveHybridChunks(
   return promoteSymbolHit(combined, question)
 }
 
-export async function retrieveAnswerChunks(
-  indexId: string,
-  question: string,
-  scope?: SearchScope,
-): Promise<SourceChunkRecord[]> {
-  const combined = await retrieveHybridChunks(indexId, question, scope)
+export async function retrieveAnswerChunks(indexId: string, question: string): Promise<SourceChunkRecord[]> {
+  const combined = await retrieveHybridChunks(indexId, question)
   const ordered = await orderByRerank(question, combined)
   return promoteSymbolHit(ordered, question)
 }
@@ -115,19 +100,13 @@ function rerankUrl(): string {
   return 'https://openrouter.ai/api/v1/rerank'
 }
 
-async function vectorIds(
-  indexId: string,
-  question: string,
-  topK: number,
-  filter: ReturnType<typeof metadataFilter>,
-): Promise<string[]> {
+async function vectorIds(indexId: string, question: string, topK: number): Promise<string[]> {
   const vector = await embedQuestion(formatQueryInput(question))
   const result = await getVectors().query(vector, {
     topK,
     namespace: indexId,
     returnValues: false,
     returnMetadata: 'none',
-    ...(filter ? { filter } : {}),
   })
   return (result.matches ?? []).map((match) => match.id)
 }
@@ -175,10 +154,6 @@ async function keywordIds(input: SearchInput): Promise<string[]> {
     match,
     limit: input.limit,
   })
-}
-
-function rowsInScope(rows: SourceChunkRecord[], scope: SearchScope | undefined): SourceChunkRecord[] {
-  return rows.filter((row) => matchesScope(row.path, row.language, scope))
 }
 
 async function rowsInOrder(indexId: string, ids: string[]): Promise<SourceChunkRecord[]> {
