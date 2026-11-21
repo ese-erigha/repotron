@@ -126,7 +126,7 @@ The header links to `/dashboard`. The fixture API returns two summaries, so `pnp
 
 ### Stage 2: Store a develop run
 
-**Status.** Not started. Start after stage 1.
+**Status.** A manual eval on `develop` writes `evals/<commitSha>.json` after the gate passes. A pull request run skips that step. A failed gate does not reach it.
 
 - After a successful eval on `develop`, put `evals/<commitSha>.json` in `repotron-staging-batches`.
 - A pull request eval does not put an object.

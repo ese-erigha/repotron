@@ -76,6 +76,7 @@ def main() -> None:
             "outputTokens": output_tokens,
             "dollars": dollars(input_tokens, output_tokens),
         },
+        "identifierHitAt1": _required(retrieval.identifier_hit_at_1, "identifierHitAt1"),
         "questions": records,
     }
     (ROOT / "report.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")

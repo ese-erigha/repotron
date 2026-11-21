@@ -214,6 +214,27 @@ jobs:
           EVAL_GATEWAY_ORIGIN: ${{ needs.preview.outputs.origin }}
           WRITE_BASELINE: ${{ inputs.write_baseline }}
         run: uv run python -m evals.run
+      - uses: pnpm/action-setup@v4
+        if: github.event_name == 'workflow_dispatch'
+      - uses: actions/setup-node@v4
+        if: github.event_name == 'workflow_dispatch'
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Store the develop summary
+        if: github.event_name == 'workflow_dispatch'
+        working-directory: ${{ github.workspace }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          pnpm install --frozen-lockfile
+          commit=$(git rev-parse HEAD)
+          key=$(cd apps/evals && uv run python -m evals.store "$commit")
+          pnpm exec cf r2 objects put "$key" \
+            --bucket-name repotron-staging-batches \
+            --file apps/evals/summary.json \
+            --content-type application/json
       - name: Open a pull request for the baseline
         if: inputs.write_baseline
         working-directory: ${{ github.workspace }}
