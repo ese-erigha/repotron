@@ -12,16 +12,14 @@ import { FeatureNameDialog } from './feature-name-dialog'
 import { PresetButtons } from './preset-buttons'
 import { QuestionForm } from './question-form'
 import { QuestionSuggestions } from './question-suggestions'
-import { SymbolTraceBox } from '../symbols/symbol-trace-box'
 
 type AskPanelProps = {
-  indexId: string
   answer: AnswerStreamState
   onAsk(request: AskRequest): void
 }
 
 /** The question form, the answer, and the sources of one index. */
-export function AskPanel({ indexId, answer, onAsk }: AskPanelProps) {
+export function AskPanel({ answer, onAsk }: AskPanelProps) {
   const [isFeatureDialogOpen, setIsFeatureDialogOpen] = useState(false)
   const [lastRequest, setLastRequest] = useState<AskRequest | null>(null)
   const { focusedNumber, focusCitation } = useCitationFocus()
@@ -64,7 +62,6 @@ export function AskPanel({ indexId, answer, onAsk }: AskPanelProps) {
             />
           }
         />
-        <SymbolTraceBox indexId={indexId} />
         {isIdle ? (
           <QuestionSuggestions onSelect={(question) => ask(questionRequest(question))} />
         ) : (

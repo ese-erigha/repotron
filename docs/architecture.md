@@ -32,7 +32,6 @@ Python runs where the work needs it: parsing and evaluation. Parsing a large rep
   ├── GET  /api/v1/indexes/:id              status
   ├── POST /api/v1/indexes/:id/questions    retrieve, stream answer
   ├── GET  /api/v1/questions/:id            shared answer
-  ├── GET  /api/v1/indexes/:id/symbols/:name   symbol trace · Phase 3
   └── GET  /api/v1/evals                    dashboard data · Phase 4
     │
     │  Workflow binding
@@ -347,16 +346,9 @@ Vectorize returns 50 results at most when a query asks for metadata. That limit 
 
 The cleanup cron starts the same Workflow.
 
-### Scenario D: The user traces a symbol (Phase 3)
+### Scenario D: A symbol list is not on the ask screen
 
-1. The gateway applies the rate limit and loads the index.
-2. It queries `chunk_keywords` for the symbol name in the `identifiers` column, in that index. The limit is 50 rows.
-3. It splits the rows into two lists:
-   - Definitions: rows where `source_chunks.symbol` equals the name
-   - Usages: the other rows
-4. It returns the definitions first, then the usages, each with the path, the line range, and the GitHub link.
-
-The trace calls no model, so it costs no tokens.
+The ask screen does not offer a name lookup. A person who can type the name already has GitHub search. A question that starts with "where is" already puts the definition first.
 
 ### Scenario E: The user opens a shared answer
 

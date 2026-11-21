@@ -152,11 +152,9 @@ The ask form gains two optional fields: language, and path prefix. The question 
 
 Vectorize uses its metadata filter when the value fits in 64 bytes. A longer path prefix is applied after the query, on the D1 rows. BM25 results are filtered on `source_chunks.language` and `source_chunks.path` after the id list returns.
 
-### Decision H: A trace spends one question from the hourly limit
+### Decision H: A symbol list is not on the ask screen
 
-`GET /api/v1/indexes/:id/symbols/:name` applies the question rate limit. The eval token does not apply to this route.
-
-The query reads `chunk_keywords` for that symbol in that index. The limit is 50 rows. Definitions are rows whose `source_chunks.symbol` equals the name. Usages are the other rows. The response lists definitions first. Each item has the path, the line range, and the GitHub link at the index commit. The route calls no model.
+The ask screen does not look up a name. A "where is" question already puts the definition first. A person who knows the name can use GitHub search.
 
 ---
 
@@ -245,7 +243,7 @@ The production path stays dense.
 
 ### Stage 8: Add the symbol trace
 
-**Status.** The ask screen can trace one name. The route lists the definition first, then the usages. It calls no model. The question rate limit applies.
+**Status.** The trace was removed from the ask screen. A person who can type the name already has GitHub search. A "where is" question already puts the definition first.
 
 - Add `GET /api/v1/indexes/:id/symbols/:name`.
 - Add the trace box on the ask screen.

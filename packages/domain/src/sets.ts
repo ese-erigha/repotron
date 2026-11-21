@@ -71,10 +71,3 @@ export const RATE_LIMIT_KIND = {
 } as const
 
 export type RateLimitKind = (typeof RATE_LIMIT_KIND)[keyof typeof RATE_LIMIT_KIND]
-
-export const SYMBOL_HIT_ROLE = {
-  definition: 'definition',
-  usage: 'usage',
-} as const
-
-export type SymbolHitRole = (typeof SYMBOL_HIT_ROLE)[keyof typeof SYMBOL_HIT_ROLE]

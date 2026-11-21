@@ -96,11 +96,11 @@ export function RepositoryScreen() {
         return (
           <div className="space-y-6">
             {status.index ? <ReindexBanner status={status.index.status} /> : null}
-            <AskPanel indexId={activeIndexIdOf(status.index) ?? ''} answer={stream.answer} onAsk={stream.ask} />
+            <AskPanel answer={stream.answer} onAsk={stream.ask} />
           </div>
         )
       case REPOSITORY_VIEW.ASK:
-        return <AskPanel indexId={activeIndexIdOf(status.index) ?? ''} answer={stream.answer} onAsk={stream.ask} />
+        return <AskPanel answer={stream.answer} onAsk={stream.ask} />
     }
   }
 

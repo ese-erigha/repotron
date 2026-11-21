@@ -6,7 +6,6 @@ export {
   PRESET,
   RATE_LIMIT_KIND,
   STREAM_EVENT,
-  SYMBOL_HIT_ROLE,
 } from './sets.ts'
 export type {
   ChunkKind,
@@ -16,7 +15,6 @@ export type {
   Preset,
   RateLimitKind,
   StreamEventName,
-  SymbolHitRole,
 } from './sets.ts'
 export {
   CHUNK_BATCH_SIZE,
@@ -70,8 +68,6 @@ export {
   presetSchema,
   questionViewSchema,
   retrievalEventSchema,
-  symbolHitSchema,
-  symbolTraceSchema,
   tokenEventSchema,
 } from './schemas.ts'
 export type {
@@ -82,8 +78,6 @@ export type {
   IndexView,
   QuestionView,
   RetrievalEvent,
-  SymbolHit,
-  SymbolTrace,
   TokenEvent,
 } from './schemas.ts'
 export { CONTRACT_LIMITS, buildContract } from './contract.ts'

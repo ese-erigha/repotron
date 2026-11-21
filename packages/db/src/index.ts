@@ -6,7 +6,6 @@ export { AnsweredQuestionRepository } from './repositories/answered-question.rep
 export { GithubRepositoryRepository } from './repositories/github-repository.repository.ts'
 export { RepositoryIndexRepository } from './repositories/repository-index.repository.ts'
 export { SourceChunkRepository } from './repositories/source-chunk.repository.ts'
-export type { SymbolChunkRow } from './repositories/source-chunk.repository.ts'
 export type { NewSourceChunkRecord, SourceChunkRecord } from './schema/source-chunks.ts'
 export type { NewRepositoryIndexRecord, RepositoryIndexRecord } from './schema/repository-indexes.ts'
 export type { AnsweredQuestionRecord, NewAnsweredQuestionRecord } from './schema/answered-questions.ts'
