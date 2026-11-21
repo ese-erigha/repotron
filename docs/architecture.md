@@ -138,7 +138,7 @@ React and Vite. The Worker `repotron-staging-web` serves the Vite client build a
 - `/` holds the link box, Turnstile, and the recent list.
 - `/r/:owner/:repo?index=<indexId>` shows the status, then the ask screen. A reload reads the status by id, so it needs no new Turnstile token.
 - `/a/:id` shows one shared answer.
-- `/dashboard` shows the eval chart. Phase 4.
+- `/dashboard` shows recall, retrieval speed, and cost. The header links to it.
 
 The ask screen reads the answer stream with `fetch` and a stream reader. The citation panel renders the `retrieval` event before the first token.
 

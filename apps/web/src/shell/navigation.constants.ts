@@ -1,4 +1,5 @@
 export const HOME_PATH = '/'
+export const DASHBOARD_PATH = '/dashboard'
 export const REPOSITORY_ROUTE = '/r/:owner/:repo'
 export const ANSWER_ROUTE = '/a/:id'
 export const NOT_FOUND_ROUTE = '*'

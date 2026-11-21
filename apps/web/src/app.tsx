@@ -1,10 +1,11 @@
 import { lazy } from 'react'
 import { Route, Routes } from 'react-router-dom'
 
+import { DashboardScreen } from './screens/dashboard-screen'
 import { HomeScreen } from './screens/home-screen'
 import { NotFoundScreen } from './screens/not-found-screen'
 import { AppShell } from './shell/app-shell'
-import { ANSWER_ROUTE, HOME_PATH, NOT_FOUND_ROUTE, REPOSITORY_ROUTE } from './shell/navigation.constants'
+import { ANSWER_ROUTE, DASHBOARD_PATH, HOME_PATH, NOT_FOUND_ROUTE, REPOSITORY_ROUTE } from './shell/navigation.constants'
 
 // These 2 screens hold the Markdown renderer. The home screen loads without it.
 const RepositoryScreen = lazy(async () => {
@@ -22,6 +23,7 @@ export function App() {
     <Routes>
       <Route element={<AppShell />}>
         <Route path={HOME_PATH} element={<HomeScreen />} />
+        <Route path={DASHBOARD_PATH} element={<DashboardScreen />} />
         <Route path={REPOSITORY_ROUTE} element={<RepositoryScreen />} />
         <Route path={ANSWER_ROUTE} element={<AnswerScreen />} />
         <Route path={NOT_FOUND_ROUTE} element={<NotFoundScreen />} />
