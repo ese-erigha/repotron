@@ -7,9 +7,11 @@
     "build": "tsc -p tsconfig.build.json",
     "lint": "oxlint",
     "typecheck": "tsc -p tsconfig.json --noEmit --pretty false",
-    "test": "node --test $(find src -name '*.test.ts')"
+    "test": "node --experimental-test-module-mocks --test $(find src -name '*.test.ts')"
   },
   "dependencies": {
+    "@modelcontextprotocol/server": "2.4.0",
+    "agents": "^0.34.0",
     "db": "workspace:*",
     "hono": "^4.13.14",
     "log": "workspace:*",

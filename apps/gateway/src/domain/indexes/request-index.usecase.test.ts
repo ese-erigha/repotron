@@ -5,7 +5,7 @@ import { ERROR_CODE, INDEX_STATUS } from 'repotron-domain'
 import type { GatewayEnv } from '../../env.ts'
 import { gatewayStorage, type GatewayContext } from '../../context.ts'
 import { RequestError } from '../../http-error.ts'
-import { requestIndex } from './usecases/request-index.usecase.ts'
+import { requestIndex, startPublicIndex } from './usecases/request-index.usecase.ts'
 
 const config = {
   APP_ORIGIN: 'https://repotron.example',
@@ -93,6 +93,18 @@ describe('requestIndex', () => {
     assert.equal(result.status, 200)
     assert.deepEqual(written, [])
   })
+
+  it('when an agent starts an index, then the request skips the browser check', async () => {
+    const written: string[] = []
+    const responses = [
+      json({ id: 9, private: false, size: 1, name: 'repo', default_branch: 'main', owner: { login: 'owner' } }),
+      json({ commit: { sha: 'a'.repeat(40) } }),
+      json({ truncated: false, tree: [{ type: 'blob' }] }),
+    ]
+    const result = await runStart(fetchQueue(responses), written, 'https://github.com/owner/repo')
+    assert.equal(result.status, 201)
+    assert.deepEqual(written, [`9-${'a'.repeat(40)}`])
+  })
 })
 
 async function run(
@@ -109,6 +121,16 @@ async function run(
     return await gatewayStorage.run(context(written, existingId, restarted, existingStatus), () =>
       requestIndex({ url, turnstileToken: 'token', remoteIp: '203.0.113.5' }),
     )
+  } finally {
+    globalThis.fetch = original
+  }
+}
+
+async function runStart(fetchImpl: typeof fetch, written: string[], url: string) {
+  const original = globalThis.fetch
+  globalThis.fetch = fetchImpl
+  try {
+    return await gatewayStorage.run(context(written), () => startPublicIndex({ url, remoteIp: '203.0.113.5' }))
   } finally {
     globalThis.fetch = original
   }

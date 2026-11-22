@@ -99,5 +99,4 @@ Each step ends with one check on staging.
 - Private repositories through a GitHub App
 - A branch picker. Refer to [future-works.md](future-works.md).
 - Questions across two or more repositories
-- An MCP server that exposes the search, for use by the DevOps PR agent of Project 3
 - A call graph view from the Tree-sitter output
