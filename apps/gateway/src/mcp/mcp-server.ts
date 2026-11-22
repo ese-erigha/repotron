@@ -32,7 +32,7 @@ function registerStartIndex(server: McpServer): void {
       title: 'Start an index',
       description:
         'Start an index for a public GitHub repository. Returns the existing index when that commit is already known. Call read_index until status is ready.',
-      inputSchema: z.object({ url: z.string().trim().min(1) }),
+      inputSchema: z.object({ url: z.string().trim().url() }),
       outputSchema: z.object({ index: indexViewSchema }),
     },
     async ({ url }) =>
