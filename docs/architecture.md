@@ -32,7 +32,8 @@ Python runs where the work needs it: parsing and evaluation. Parsing a large rep
   ├── GET  /api/v1/indexes/:id              status
   ├── POST /api/v1/indexes/:id/questions    retrieve, stream answer
   ├── GET  /api/v1/questions/:id            shared answer
-  └── GET  /api/v1/evals                    dashboard data · Phase 4
+  ├── GET  /api/v1/evals                    dashboard data · Phase 4
+  └── POST /mcp                             agent tools · Bearer MCP_TOKEN
     │
     │  Workflow binding
     ▼
@@ -149,6 +150,8 @@ The ask screen reads the answer stream with `fetch` and a stream reader. The cit
 Hono. One controller for each route group. One use case for each action.
 
 **CORS.** The `cors` middleware from Hono allows one origin, `APP_ORIGIN`, the web Worker URL. It allows `GET`, `POST`, and the `Content-Type` header. It exposes `Retry-After`. The API sets no cookie, so it allows no credentials.
+
+**Agent tools.** `POST /mcp` serves `start_index`, `read_index`, and `ask`. The caller sends `Authorization: Bearer` with the `MCP_TOKEN` secret. The token replaces the browser check. The hourly limits stay. The dashboard is not a tool. Set the secret with `cf workers secrets update MCP_TOKEN` on the gateway. A missing secret rejects `/mcp` and leaves the website working.
 
 **Index request.**
 
@@ -366,7 +369,7 @@ The ask screen does not offer a name lookup. A person who can type the name alre
 - **Abuse.** Turnstile and the `RateLimiter` Durable Object guard the gateway. The size limits guard the container.
 - **CORS.** The gateway allows only the web origin. CORS does not stop a script outside a browser, so Turnstile and the rate limits stay the real guard.
 - **Index scope.** The index id comes from the route. Each Vectorize query sets the namespace. Each D1 chunk query filters on the index id. Each FTS5 query starts with the index id.
-- **Secrets.** `TURNSTILE_SECRET`, `GITHUB_TOKEN`, `OPENROUTER_API_KEY`, `CF_AIG_TOKEN`, and `EVAL_TOKEN` are gateway secrets. The answer request sends `CF_AIG_TOKEN` in `cf-aig-authorization`. `GITHUB_TOKEN`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `OPENROUTER_API_KEY`, and `CF_AIG_TOKEN` are pipeline secrets. The pipeline passes `GITHUB_TOKEN` and the two R2 keys to the container. The web Worker has no secret.
+- **Secrets.** `TURNSTILE_SECRET`, `GITHUB_TOKEN`, `OPENROUTER_API_KEY`, `CF_AIG_TOKEN`, `EVAL_TOKEN`, and `MCP_TOKEN` are gateway secrets. The answer request sends `CF_AIG_TOKEN` in `cf-aig-authorization`. `GITHUB_TOKEN`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `OPENROUTER_API_KEY`, and `CF_AIG_TOKEN` are pipeline secrets. The pipeline passes `GITHUB_TOKEN` and the two R2 keys to the container. The web Worker has no secret.
 
 ---
 

@@ -22,10 +22,16 @@ import { toIndexView } from '../index-view.ts'
 import { verifyTurnstile } from '../verify-turnstile.ts'
 
 export type RequestIndexInput = { url: string; turnstileToken: string; remoteIp: string }
+export type StartPublicIndexInput = { url: string; remoteIp: string }
 export type RequestIndexResult = { status: 200 | 201; index: IndexView }
 
 export async function requestIndex(input: RequestIndexInput): Promise<RequestIndexResult> {
   await verifyTurnstile(input.turnstileToken, input.remoteIp)
+  return startPublicIndex({ url: input.url, remoteIp: input.remoteIp })
+}
+
+/** Starts an index for a public repository. The caller already checked the agent token. */
+export async function startPublicIndex(input: StartPublicIndexInput): Promise<RequestIndexResult> {
   await consumeLimit(RATE_LIMIT_KIND.index, input.remoteIp)
   const link = parseRepositoryLink(input.url)
   if (!link) throw new RequestError(400, ERROR_CODE.validationFailed, 'The repository link is invalid.')
